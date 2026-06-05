@@ -116,8 +116,8 @@ class TestMarkdownRenderer:
 
     def test_jinja2_template_loads(self):
         """The Jinja2 template should load without errors."""
-        from app.output.markdown import get_template
-        template = get_template("report.md.j2")
+        from app.output.markdown import _REPORT_TEMPLATE
+        template = _REPORT_TEMPLATE
         assert template is not None
         rendered = template.render(title="Test")
         assert "Test" in rendered
@@ -222,9 +222,135 @@ class TestPDFRenderer:
 
     def test_pdf_default_configuration(self):
         """PDF generation should use sensible defaults (A4, portrait, mm)."""
-        from app.output.pdf import create_pdf
-        pdf = create_pdf()
+        from app.output.pdf import ReportPDF
+        pdf = ReportPDF()
         assert pdf is not None
         assert hasattr(pdf, "output")
         assert hasattr(pdf, "add_page")
         assert hasattr(pdf, "set_font")
+
+    def test_pdf_full_report_with_metadata(self):
+        """Full report markdown with metadata, tables, code, quotes renders safely."""
+        from app.output.pdf import render_pdf
+        md = (
+            "# Test Analysis\n\n"
+            "**Source:** YouTube | https://youtube.com/watch?v=abc\n"
+            "**Analyzed:** 2026-06-05\n\n"
+            "---\n\n"
+            "## Executive Summary\n\n"
+            "This is a **bold** and *italic* test with `inline code`.\n\n"
+            "## Key Takeaways\n\n"
+            "- First item with **bold**\n"
+            "- Second item with *italic*\n"
+            "- Third item with `code`\n\n"
+            "## Code Example\n\n"
+            "```python\n"
+            "def hello():\n"
+            '    print("world")\n'
+            "```\n\n"
+            "## Quote Example\n\n"
+            "> This is a **blockquote** with *formatting*\n\n"
+            "## Table Test\n\n"
+            "| A | B |\n"
+            "|---|---|\n"
+            "| 1 | 2 |\n\n"
+            "---\n\n"
+            "## Final\n\n"
+            "Normal paragraph with a [link](https://example.com)."
+        )
+        pdf_bytes = render_pdf(md)
+        assert pdf_bytes[:5] == b"%PDF-"
+        assert len(pdf_bytes) > 1000
+
+    def test_pdf_renders_actual_text_content(self):
+        """Generated PDF should contain readable text when extracted."""
+        from app.output.pdf import render_pdf
+        import fitz
+        md = "# Title\n\n## Section One\n\nVisible text content here.\n\n## Section Two\n\nMore visible text."
+        pdf_bytes = render_pdf(md)
+        doc = fitz.open("pdf", pdf_bytes)
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert "Section One" in text
+        assert "Section Two" in text
+        assert "Visible text content" in text
+
+    def test_pdf_renders_bold_and_italic_text(self):
+        """Bold and italic markdown should produce text content in PDF."""
+        from app.output.pdf import render_pdf
+        import fitz
+        md = "# Styling\n\n**Bold text** and *italic text* and `inline code`."
+        pdf_bytes = render_pdf(md)
+        doc = fitz.open("pdf", pdf_bytes)
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert "Bold text" in text
+        assert "italic text" in text
+        assert "inline code" in text
+
+    def test_pdf_renders_list_items(self):
+        """Markdown lists should render their text in PDF."""
+        from app.output.pdf import render_pdf
+        import fitz
+        md = "# List Test\n\n- First item\n- Second item\n- Third item"
+        pdf_bytes = render_pdf(md)
+        doc = fitz.open("pdf", pdf_bytes)
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert "First item" in text
+        assert "Second item" in text
+        assert "Third item" in text
+
+    def test_pdf_renders_code_block(self):
+        """Code blocks should render their content in PDF."""
+        from app.output.pdf import render_pdf
+        import fitz
+        md = "```python\ndef hello():\n    print('world')\n```"
+        pdf_bytes = render_pdf(md)
+        doc = fitz.open("pdf", pdf_bytes)
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert "hello" in text
+        assert "print" in text
+
+    def test_pdf_cover_page_shows_title(self):
+        """PDF cover page should include the report title."""
+        from app.output.pdf import render_pdf
+        import fitz
+        md = "# Custom Report Title\n\n---\n\nContent."
+        pdf_bytes = render_pdf(md, title="Custom Report Title")
+        doc = fitz.open("pdf", pdf_bytes)
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert "Custom Report Title" in text
+
+    @pytest.mark.parametrize("md,expected_section", [
+        ("## Executive Summary\n\nContent.", "Executive Summary"),
+        ("## Key Takeaways\n\nContent.", "Key Takeaways"),
+        ("## Risks & Limitations\n\nContent.", "Risks & Limitations"),
+    ])
+    def test_pdf_preserves_section_headings(self, md, expected_section):
+        """Section H2 headings should appear in rendered PDF."""
+        from app.output.pdf import render_pdf
+        import fitz
+        pdf_bytes = render_pdf(md)
+        doc = fitz.open("pdf", pdf_bytes)
+        text = "".join(page.get_text() for page in doc)
+        doc.close()
+        assert expected_section in text
+
+    @pytest.mark.parametrize("md,expected_stripped", [
+        ("# Title\n\n---\n\nBody", "Body"),
+        ("No separator here", "No separator here"),
+        ("---\n\nSecond ---\n\nBody", "Second"),
+        ("", ""),
+        ("# Only metadata\n\n---", ""),
+    ])
+    def test_strip_front_matter(self, md, expected_stripped):
+        """Front matter before first --- should be stripped."""
+        from app.output.pdf import _strip_front_matter
+        result = _strip_front_matter(md).strip()
+        if expected_stripped:
+            assert result.startswith(expected_stripped)
+        else:
+            assert not result

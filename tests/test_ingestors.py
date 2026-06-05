@@ -97,9 +97,14 @@ class TestYouTubeIngestor:
         ("https://youtu.be/abc123", "abc123"),
         ("https://www.youtube.com/watch?v=abc123&t=30", "abc123"),
         ("https://m.youtube.com/watch?v=abc123", "abc123"),
+        ("https://youtube.com/shorts/abc123", "abc123"),
+        ("https://www.youtube.com/embed/abc123", "abc123"),
+        ("https://www.youtube.com/live/abc123", "abc123"),
+        ("https://youtu.be/abc123?si=xyz&t=10", "abc123"),
+        ("https://music.youtube.com/watch?v=abc123", "abc123"),
     ])
     def test_extract_video_id_common_patterns(self, url, expected_id):
-        """Should parse various URL formats."""
+        """Should parse various URL formats including shorts, embed, live."""
         from app.ingestors.youtube import YouTubeIngestor
         ing = YouTubeIngestor()
         assert ing._extract_video_id(url) == expected_id
@@ -215,8 +220,8 @@ class TestArticleIngestor:
         """Happy path: fetches and extracts article content."""
         mock_fetch.return_value = "<html><body><article>Content</article></body></html>"
         mock_extract.side_effect = [
-            "Article body content here.",
             '{"title": "Test Article", "author": "Jane", "date": "2025-01-01"}',
+            "Article body content here.",
         ]
         from app.ingestors.article import ArticleIngestor
         ing = ArticleIngestor()

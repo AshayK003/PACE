@@ -16,6 +16,7 @@ class YouTubeIngestor(BaseIngestor):
             r"m\.youtube\.com/watch\?",
             r"youtube\.com/embed/",
             r"youtube\.com/shorts/",
+            r"youtube\.com/live/",
         ]
         return any(re.search(p, source) for p in patterns)
 
@@ -28,6 +29,7 @@ class YouTubeIngestor(BaseIngestor):
             r"(?:m\.youtube\.com/watch\?.*v=)([\w-]+)",
             r"(?:youtube\.com/embed/)([\w-]+)",
             r"(?:youtube\.com/shorts/)([\w-]+)",
+            r"(?:youtube\.com/live/)([\w-]+)",
         ]
         for pattern in patterns:
             m = re.search(pattern, url)

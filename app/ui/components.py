@@ -1,12 +1,21 @@
 import streamlit as st
 
-from app.config import SourceType
 
-
-def source_type_selector() -> SourceType:
-    options = [t.value for t in SourceType]
-    selected = st.selectbox("Select source type", options, index=0)
-    return SourceType(selected)
+def render_empty_state() -> None:
+    st.markdown("### Welcome to PACE")
+    st.markdown(
+        "Select a source type above to analyze content into "
+        "a structured report with summaries, takeaways, and insights."
+    )
+    guide = [
+        ("\U0001f517", "YouTube", "Paste a video URL to analyze its transcript"),
+        ("\U0001f4c4", "PDF", "Upload a PDF document for text extraction"),
+        ("\U0001f310", "Article", "Enter a web article URL to extract and analyze"),
+        ("\U0001f399\ufe0f", "Audio", "Upload an audio file for transcription (local only)"),
+        ("\u270d\ufe0f", "Text", "Paste or type raw text directly"),
+    ]
+    for icon, label, desc in guide:
+        st.markdown(f"**{icon} {label}** — {desc}")
 
 
 def render_download_buttons(md_content: str, pdf_bytes: bytes, filename_base: str = "report") -> None:
@@ -30,6 +39,7 @@ def render_download_buttons(md_content: str, pdf_bytes: bytes, filename_base: st
 
 
 def display_report(md_content: str) -> None:
+    st.markdown("## Report")
     st.markdown(md_content)
 
 

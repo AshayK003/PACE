@@ -115,3 +115,41 @@ class TestCleaner:
         cleaned = clean_pipeline(text)
         assert cleaned is not None
         assert "Hello" in cleaned
+
+    @pytest.mark.parametrize("input_text,expected_terms", [
+        ("Emoji test 🔥🚀 is cool", ["Emoji", "test", "cool"]),
+        ("Café résumé über naïve", ["Café", "résumé", "über", "naïve"]),
+        ("中文測試 日本語 확인", ["中文測試", "日本語", "확인"]),
+        ("Hello\n\n\n\n\nWorld", ["Hello", "World"]),
+        ("So, um, basically hello", ["hello"]),
+    ])
+    def test_cleaner_with_unicode_and_varied_inputs(self, input_text, expected_terms):
+        """Cleaner should handle emoji, CJK, accented chars, and fillers."""
+        from app.processors.cleaner import clean_pipeline
+        result = clean_pipeline(input_text)
+        for term in expected_terms:
+            assert term in result, f"Expected {term!r} in {result!r}"
+
+    def test_cleaner_removes_urls(self):
+        """URLs should be stripped while surrounding text is preserved."""
+        from app.processors.cleaner import clean_pipeline
+        text = "Visit https://example.com/page?q=test&ref=1 for details."
+        result = clean_pipeline(text)
+        assert "https://" not in result
+        assert "Visit" in result
+        assert "details" in result
+
+    def test_cleaner_with_only_fillers(self):
+        """Text consisting entirely of filler words should become empty."""
+        from app.processors.cleaner import clean_pipeline
+        assert clean_pipeline("um uh like basically you know") == ""
+
+    def test_cleaner_with_mixed_timestamps_and_fillers(self):
+        """Timestamps and fillers should both be removed."""
+        from app.processors.cleaner import clean_pipeline
+        text = "00:15 So, um, basically the result was positive. 01:30 And, like, we saw improvement."
+        result = clean_pipeline(text)
+        assert "00:15" not in result
+        assert "um" not in result
+        assert "result was positive" in result
+        assert "saw improvement" in result

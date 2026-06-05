@@ -1,4 +1,5 @@
 import os
+import re
 from enum import Enum
 
 import streamlit as st
@@ -50,3 +51,14 @@ def get_api_key() -> str:
         except (FileNotFoundError, ValueError):
             pass
     return key
+
+
+def safe_filename(title: str, max_len: int = 60) -> str:
+    name = re.sub(r"[^\w\s-]", "", title).strip().lower()
+    name = re.sub(r"[-\s]+", "_", name)
+    name = name.strip("_")
+    if not name:
+        return "report"
+    if len(name) > max_len:
+        name = name[:max_len].rstrip("_")
+    return name

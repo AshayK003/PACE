@@ -14,16 +14,12 @@ pypdf>=5.0.0
 
 # Text Processing
 semchunk>=4.0.0
-transformers>=4.40.0
 tiktoken>=0.8.0
 
 # Output
 jinja2>=3.1.0
 fpdf2>=2.8.0
 mistletoe>=1.0.0
-
-# Quality
-guardrails-ai>=0.6.0
 
 # Utilities
 tenacity>=9.0.0

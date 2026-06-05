@@ -1,11 +1,21 @@
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable
 
 from app.analyzers.llm_client import LLMClient
-from app.analyzers.prompts import ALL_PROMPTS, SYSTEM_PROMPT
+from app.analyzers.prompts import (
+    ALL_PROMPTS, SYSTEM_PROMPT,
+    BATCH_A_PROMPT, BATCH_B_PROMPT, BATCH_C_PROMPT,
+)
+from app.analyzers.parser import batch_a_response, batch_b_response, batch_c_response
 
 _MAX_CONTENT_CHARS = 50000
+
+_BATCH_A_SECTIONS = ["executive_summary", "key_takeaways"]
+_BATCH_B_SECTIONS = ["detailed_analysis", "supporting_evidence"]
+_BATCH_C_SECTIONS = ["frameworks", "action_items", "risks", "notable_quotes"]
+_INDEPENDENT_SECTIONS = _BATCH_A_SECTIONS + _BATCH_B_SECTIONS + _BATCH_C_SECTIONS
+_DEPENDENT_SECTIONS = ["missing_important", "final_synthesis"]
 
 
 @dataclass
@@ -25,13 +35,53 @@ class AnalysisPipeline:
         ]
 
     def run_step(self, step: PipelineStep, context: str) -> str:
-        if len(context) > _MAX_CONTENT_CHARS:
-            context = context[:_MAX_CONTENT_CHARS] + "\n\n[Content truncated due to length]"
-        prompt = step.prompt_template.format(content=context)
+        prompt = step.prompt_template.replace("__CONTENT__", context)
         return self.client.send(
             system_prompt=SYSTEM_PROMPT,
             user_message=prompt,
         )
+
+    def _send_batch(self, prompt: str) -> str:
+        return self.client.send(
+            system_prompt=SYSTEM_PROMPT,
+            user_message=prompt,
+        )
+
+    def _run_batch_a(self, context: str) -> dict[str, str]:
+        prompt = BATCH_A_PROMPT.replace("__CONTENT__", context)
+        response = self._send_batch(prompt)
+        result = batch_a_response(response)
+        if response and all(len(result[s].strip()) >= 20 for s in _BATCH_A_SECTIONS if result[s]):
+            return result
+        fallback = {}
+        for name in _BATCH_A_SECTIONS:
+            step = next(s for s in self.steps if s.name == name)
+            fallback[name] = self._run_step_safe(step, context)
+        return fallback
+
+    def _run_batch_b(self, context: str) -> dict[str, str]:
+        prompt = BATCH_B_PROMPT.replace("__CONTENT__", context)
+        response = self._send_batch(prompt)
+        result = batch_b_response(response)
+        if response and all(len(result[s].strip()) >= 20 for s in _BATCH_B_SECTIONS if result[s]):
+            return result
+        fallback = {}
+        for name in _BATCH_B_SECTIONS:
+            step = next(s for s in self.steps if s.name == name)
+            fallback[name] = self._run_step_safe(step, context)
+        return fallback
+
+    def _run_batch_c(self, context: str) -> dict[str, str]:
+        prompt = BATCH_C_PROMPT.replace("__CONTENT__", context)
+        response = self._send_batch(prompt)
+        result = batch_c_response(response)
+        if response and all(len(result[s].strip()) >= 20 for s in _BATCH_C_SECTIONS if result[s]):
+            return result
+        fallback = {}
+        for name in _BATCH_C_SECTIONS:
+            step = next(s for s in self.steps if s.name == name)
+            fallback[name] = self._run_step_safe(step, context)
+        return fallback
 
     def run_all(
         self,
@@ -39,20 +89,46 @@ class AnalysisPipeline:
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> dict[str, str]:
         self.results = {}
-        total = len(self.steps)
+
+        if not context or not context.strip():
+            empty_msg = "[No content provided for analysis. Please provide text, a URL, or a file to analyze.]"
+            for name in list(ALL_PROMPTS.keys()):
+                self.results[name] = empty_msg
+            return self.results
 
         effective_context = self._truncate_if_needed(context)
 
-        for i, step in enumerate(self.steps):
-            progress = (i + 1) / total
-            if progress_callback:
-                progress_callback(step.name, progress)
+        if progress_callback:
+            progress_callback("batches", 0.05)
 
-            if i > 0 and i < total - 1:
-                time.sleep(0.3)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(self._run_batch_a, effective_context): "batch_a",
+                executor.submit(self._run_batch_b, effective_context): "batch_b",
+                executor.submit(self._run_batch_c, effective_context): "batch_c",
+            }
+            for future in as_completed(futures):
+                batch_name = futures[future]
+                try:
+                    batch_results = future.result()
+                    self.results.update(batch_results)
+                except Exception:
+                    for section in {
+                        "batch_a": _BATCH_A_SECTIONS,
+                        "batch_b": _BATCH_B_SECTIONS,
+                        "batch_c": _BATCH_C_SECTIONS,
+                    }[batch_name]:
+                        self.results[section] = f"[Analysis failed for {section}]"
 
-            result = self._run_step_safe(step, effective_context)
-            self.results[step.name] = result
+        if progress_callback:
+            progress_callback("extraction", 0.60)
+
+        for step in self.steps:
+            if step.name in _DEPENDENT_SECTIONS:
+                if progress_callback:
+                    progress_callback(step.name, 0.65 + 0.15 * (step.order - 8))
+                result = self._run_step_safe(step, effective_context)
+                self.results[step.name] = result
 
         if progress_callback:
             progress_callback("complete", 1.0)
@@ -60,10 +136,11 @@ class AnalysisPipeline:
 
     def _run_step_safe(self, step: PipelineStep, context: str) -> str:
         try:
+            if not context or not context.strip():
+                return f"[No content to analyze for {step.name}]"
             context_for_step = self._format_context_for_step(step, context)
             result = self.run_step(step, context_for_step)
             if len(result.strip()) < 20:
-                context_for_step = self._format_context_for_step(step, context)
                 result = self.run_step(step, context_for_step)
             return result
         except Exception as e:
