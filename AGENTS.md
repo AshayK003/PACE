@@ -17,7 +17,8 @@ PACE (Precise Analysis and Compilation of Extracts) is an advanced AI analysis a
 | **LLM** | DeepSeek V4 Flash Free (via OpenCode Zen API) | Free, 200K context, OpenAI-compatible |
 | **YouTube transcripts** | `youtube-transcript-api` | No API key needed, fast |
 | **YouTube audio (local only)** | `yt-dlp` → `faster-whisper` | For videos without transcripts (requires ffmpeg, not available on Community Cloud) |
-| **PDF parsing** | `OpenDataLoader` (primary) + `pypdf` (fallback) | #1 benchmark accuracy 0.907, Apache-2.0, no GPU required |
+| **PDF parsing (cloud)** | `PyMuPDF4LLM` + `pdfplumber` (tables) | Fits 1GB RAM, fast 0.09s/page, zero-config OCR. AGPL-3.0. Table supplement fixes weak extraction. |
+| **PDF parsing (local)** | `OpenDataLoader` (primary) + `pypdf` (fallback) | #1 benchmark accuracy 0.907, Apache-2.0, no GPU, requires Java 11 |
 | **Web articles** | `trafilatura` | Best open-source article extraction, JSON metadata output |
 | **Audio transcription** | `faster-whisper` | 4x faster than OpenAI Whisper, CPU-compatible |
 | **Semantic chunking** | `semchunk` | 15% better RAG performance, used by Microsoft Intel Toolkit |
@@ -92,7 +93,8 @@ User Input (URL / File / Text)
     │   └─ if no transcript: yt-dlp (audio) → faster-whisper (local only)
     │
     ├─ PDF File
-    │   └─ OpenDataLoader.convert() → structured JSON/Markdown
+    │   ├─ Cloud: PyMuPDF4LLM.to_markdown() + pdfplumber (tables)
+    │   └─ Local: OpenDataLoader.convert() → structured JSON/Markdown
     │
     ├─ Article URL
     │   └─ trafilatura.extract() → clean text + metadata
@@ -169,6 +171,20 @@ model = "deepseek-v4-flash-free"
 
 ---
 
+## Research-Backed Decisions
+
+| Decision | Evidence | Source |
+|----------|----------|--------|
+| Direct SDK over LangChain/LlamaIndex | 20% lower latency, 50% less memory, no abstraction tax for linear pipelines | Toolhalla RAG Framework Comparison 2026 |
+| fpdf2 for PDF output | Only pure-Python option without system deps; confirmed working on Streamlit Cloud | fpdf2 official docs, Streamlit community |
+| PyMuPDF4LLM for cloud PDF | Only high-accuracy parser fitting 1GB RAM; 0.09s/page, AGPL-3.0 | OpenDataLoader Benchmark |
+| faster-whisper over alternatives | 4-6x faster than Whisper, identical WER, CPU-compatible, pip-installable | HF Open ASR Leaderboard |
+| semchunk for chunking | No embedding model needed, production-proven in Microsoft Intel Toolkit | semchunk GitHub |
+| trafilatura for articles | #1 F1 score (0.958) across all open-source extractors | ScrapingHub Article Extraction Benchmark |
+| youtube-transcript-api | Only option with no API key, no headless browser, actively maintained | jdepoix/youtube-transcript-api |
+
+---
+
 ## Processing Philosophy
 
 - Signal over noise
@@ -177,6 +193,43 @@ model = "deepseek-v4-flash-free"
 - Clarity over complexity
 - Evidence over assertion
 - Analysis over simple summarization
+
+---
+
+## Key Dependencies
+
+```txt
+# Core
+streamlit>=1.40.0
+openai>=2.0.0
+
+# Content Ingestion
+youtube-transcript-api>=1.0.0
+trafilatura>=2.0.0
+pymupdf4llm>=0.2.0         # Cloud PDF parsing (AGPL-3.0)
+pdfplumber>=0.11.0          # Table supplement
+pypdf>=5.0.0                # Fallback PDF parser
+
+# Local only (not on Streamlit Cloud)
+opendataloader-pdf>=0.1.0   # Local PDF parsing, requires Java 11
+yt-dlp>=2026.1.0            # YouTube audio download
+faster-whisper>=1.0.0       # Audio transcription
+
+# Text Processing
+semchunk>=4.0.0
+
+# Output
+jinja2>=3.1.0
+fpdf2>=2.8.0
+mistletoe>=1.0.0
+
+# Quality
+guardrails-ai>=0.6.0
+
+# Utilities
+tenacity>=9.0.0             # Retry logic
+tiktoken>=0.8.0             # Token counting
+```
 
 ---
 
