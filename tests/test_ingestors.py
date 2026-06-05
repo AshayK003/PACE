@@ -79,11 +79,17 @@ class TestYouTubeIngestor:
     @patch("youtube_transcript_api.YouTubeTranscriptApi")
     def test_ingest_without_transcript_falls_back(self, mock_api):
         """When no transcript exists, should raise fallback message."""
+        from unittest.mock import MagicMock
         instance = mock_api.return_value
-        instance.fetch.side_effect = Exception("No transcript available")
+        instance.fetch.side_effect = Exception("fetch failed")
+        instance.list.return_value = MagicMock(
+            find_manually_created_transcript=MagicMock(side_effect=Exception("not found")),
+            find_generated_transcript=MagicMock(side_effect=Exception("not found")),
+            __iter__=MagicMock(return_value=iter([])),
+        )
         from app.ingestors.youtube import YouTubeIngestor
         ing = YouTubeIngestor()
-        with pytest.raises(Exception, match="No transcript available"):
+        with pytest.raises(Exception, match="No suitable transcript"):
             ing.ingest("https://youtube.com/watch?v=abc123")
 
     @pytest.mark.parametrize("url,expected_id", [

@@ -192,16 +192,15 @@ class TestPipeline:
         assert len(results) >= 0
 
     def test_pipeline_step_ordering(self, sample_text):
-        """Steps should execute in the defined order."""
+        """Steps should execute in the defined order (retries allowed)."""
         from app.analyzers.pipeline import AnalysisPipeline
         pipeline = AnalysisPipeline()
-        execution_order = []
+        seen_names = []
         original_steps = list(pipeline.steps)
-        with patch.object(pipeline, "run_step", side_effect=lambda step, ctx: execution_order.append(step.name) or ""):
+        with patch.object(pipeline, "run_step", side_effect=lambda step, ctx: seen_names.append(step.name) or "result"):
             pipeline.run_all(sample_text)
-        assert len(execution_order) == len(original_steps)
-        for i, step in enumerate(original_steps):
-            assert execution_order[i] == step.name
+        unique_in_order = list(dict.fromkeys(seen_names))
+        assert unique_in_order == [s.name for s in original_steps]
 
     def test_pipeline_passes_context_to_steps(self, sample_text):
         """Each step should receive the full content context."""
@@ -214,7 +213,7 @@ class TestPipeline:
         with patch.object(pipeline, "run_step", mock_run):
             pipeline.run_all(sample_text)
         for ctx in received_contexts:
-            assert ctx == sample_text
+            assert sample_text in ctx
 
     def test_pipeline_previous_results_available(self, sample_text):
         """Later steps should have access to previous step results."""
@@ -223,10 +222,7 @@ class TestPipeline:
         def mock_run(step, context):
             pipeline.results[step.name] = f"Result of {step.name}"
             return pipeline.results[step.name]
-        with (
-            patch.object(pipeline, "run_step", mock_run),
-            patch.object(pipeline, "_format_context_for_step", return_value=lambda s, ctx: "context"),
-        ):
+        with patch.object(pipeline, "run_step", mock_run):
             results = pipeline.run_all(sample_text)
             assert len(results) > 0
             for name in results:

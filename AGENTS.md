@@ -89,47 +89,50 @@ pace/
 User Input (URL / File / Text)
     │
     ├─ YouTube URL
-    │   ├─ youtube-transcript-api.fetch()
-    │   └─ if no transcript: yt-dlp (audio) → faster-whisper (local only)
+    │   ├─ youtube-transcript-api.list() → find best language
+    │   └─ youtube-transcript-api.fetch(video_id, languages=[en, hi, ...])
     │
     ├─ PDF File
-    │   ├─ Cloud: PyMuPDF4LLM.to_markdown() + pdfplumber (tables)
-    │   └─ Local: OpenDataLoader.convert() → structured JSON/Markdown
+    │   └─ PyMuPDF4LLM.to_markdown() + pdfplumber (tables) + pypdf (fallback)
     │
     ├─ Article URL
-    │   └─ trafilatura.extract() → clean text + metadata
+    │   └─ trafilatura.extract() → clean text + JSON metadata
     │
     ├─ Audio File
-    │   └─ faster-whisper.transcribe()
+    │   └─ faster-whisper.transcribe() (local only; cloud fallback message)
     │
-    └─ Raw Text
-        └─ Used directly
-    │
-    ▼
-Clean Text → semchunk.chunk() → semantic chunks
+    └─ Raw Text ──→ Used directly
     │
     ▼
-LLM Pipeline (sequential analysis via openai SDK + DeepSeek V4 Flash Free)
+[Optional] LLM Translation (if non-English detected via metadata)
+    │
+    ▼
+clean_pipeline() → remove fillers, dedup, timestamps, URLs
+    │
+    ▼
+semchunk.chunk() → semantic chunks (word-count tokenizer, configurable overlap)
+    │
+    ▼
+LLM Pipeline (10 sequential steps, DeepSeek V4 Flash Free via OpenAI SDK)
     ├─ Executive Summary
     ├─ Key Takeaways
     ├─ Detailed Analysis
+    ├─ Supporting Evidence
     ├─ Frameworks & Models
     ├─ Action Items
     ├─ Risks & Limitations
     ├─ Notable Quotes
-    └─ Final Synthesis
-    │
-    ▼
-Guardrails AI → validate output quality
+    ├─ Missing But Important
+    └─ Final Synthesis (receives previous results as context)
     │
     ▼
 Jinja2 Template → Markdown report (.md)
     │
     ▼
-mistletoe (MD→HTML) → fpdf2 → PDF report (.pdf)
+mistletoe (MD→HTML) → fpdf2 + DejaVu Sans → PDF report (.pdf)
     │
     ▼
-Streamlit UI → Display + Download buttons
+Streamlit UI → Display + Download buttons (MD + PDF)
 ```
 
 ---
@@ -154,6 +157,8 @@ model = "deepseek-v4-flash-free"
 # 200K context, free, OpenAI-compatible
 ```
 
+Users can also enter their own API key via the sidebar (LLM Settings → API Key), which overrides the default. The key is stored only in session state and never persisted.
+
 ---
 
 ## Output Sections (from requirements)
@@ -168,6 +173,21 @@ model = "deepseek-v4-flash-free"
 8. **Notable Quotes** — High-impact quotations
 9. **Missing But Important** — What the source didn't address
 10. **Final Synthesis** — Ultimate message + implications
+
+---
+
+## Pipeline Robustness
+
+| Layer | Safeguard |
+|-------|-----------|
+| **Content length** | Auto-truncated at 50K chars with `[Content truncated]` note |
+| **Empty LLM result** | Retried once automatically per step |
+| **Rate limiting** | 0.3s delay between sequential LLM calls |
+| **Step failure** | Per-step try/except with `[Analysis failed for {step}: {error}]` message — rest continues |
+| **PDF Unicode** | DejaVu Sans font (regular, bold, italic, bold-italic) covers all Unicode BMP — auto-downloaded from GitHub release, cached locally |
+| **Translation** | Non-English YouTube transcripts → chunked LLM translation to English with per-chunk fallback |
+| **API Key** | Sidebar input overrides default key; stored only in session state |
+| **Theme** | Dark mode via `.streamlit/config.toml` `[theme] base = "dark"` |
 
 ---
 

@@ -12,38 +12,38 @@ def chunk_text(
     chunk_size: int = 2000,
     overlap: int = 0,
     token_counter: Callable[[str], int] | None = None,
+    max_chunks: int | None = None,
 ) -> list[str]:
     if not text:
         return []
     counter = token_counter or _default_token_counter
-    if overlap > 0:
-        chunks = _chunk_with_overlap(text, chunk_size, overlap, counter)
-    else:
-        chunks = semchunk.chunk(text, chunk_size, token_counter=counter)
+    chunks = semchunk.chunk(text, chunk_size, token_counter=counter)
+    if max_chunks is not None and len(chunks) > max_chunks:
+        chunks = chunks[:max_chunks]
+    if overlap > 0 and len(chunks) > 1:
+        chunks = _add_overlap(chunks, overlap, counter)
     return chunks
 
 
-def _chunk_with_overlap(
-    text: str,
-    chunk_size: int,
+def _add_overlap(
+    chunks: list[str],
     overlap: int,
     token_counter: Callable[[str], int],
 ) -> list[str]:
-    if len(text.split()) <= chunk_size:
-        return [text]
-    chunks = semchunk.chunk(text, chunk_size, token_counter=token_counter)
-    if overlap <= 0 or len(chunks) <= 1:
-        return chunks
-    overlapped = []
-    for i, chunk in enumerate(chunks):
-        if i == 0:
-            overlapped.append(chunk)
+    result = [chunks[0]]
+    for i in range(1, len(chunks)):
+        prev = chunks[i - 1]
+        words = prev.split()
+        carry = []
+        carry_tokens = 0
+        for word in reversed(words):
+            candidate = " ".join([word] + carry) if carry else word
+            if token_counter(candidate) > overlap:
+                break
+            carry.insert(0, word)
+            carry_tokens = token_counter(" ".join(carry))
+        if carry:
+            result.append(" ".join(carry) + " " + chunks[i])
         else:
-            prev_chunk = chunks[i - 1]
-            words = prev_chunk.split()
-            if len(words) > overlap:
-                overlap_text = " ".join(words[-overlap:])
-                overlapped.append(overlap_text + " " + chunk)
-            else:
-                overlapped.append(prev_chunk + " " + chunk)
-    return overlapped
+            result.append(chunks[i])
+    return result

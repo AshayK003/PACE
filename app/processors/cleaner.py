@@ -1,4 +1,5 @@
 import re
+from typing import Pattern
 
 FILLER_WORDS = {
     "um", "uh", "like", "basically", "you know",
@@ -7,14 +8,28 @@ FILLER_WORDS = {
 }
 
 
+def _build_filler_pattern() -> Pattern:
+    words = sorted(FILLER_WORDS, key=len, reverse=True)
+    return re.compile(
+        r"\b(?:" + "|".join(re.escape(w) for w in words) + r")[,]?\s*",
+        re.IGNORECASE,
+    )
+
+
+_FILLER_PATTERN = _build_filler_pattern()
+_REPEATED_PUNCT_PATTERN = re.compile(r"[,]{2,}\s*[,]*")
+_MULTI_SPACE_PATTERN = re.compile(r"[ \t]{2,}")
+
+
 def remove_fillers(text: str) -> str:
     if not text:
         return text
-    pattern = re.compile(
-        r"\b(?:" + "|".join(re.escape(w) for w in FILLER_WORDS) + r")\b[,]?\s*",
-        re.IGNORECASE,
-    )
-    return pattern.sub("", text)
+    result = _FILLER_PATTERN.sub("", text)
+    result = _REPEATED_PUNCT_PATTERN.sub(", ", result)
+    result = _MULTI_SPACE_PATTERN.sub(" ", result)
+    result = result.replace(", ,", ",").replace("  ,", " ").replace(",  ", ", ")
+    result = result.strip().strip(",").strip()
+    return result
 
 
 def deduplicate_lines(text: str) -> str:
