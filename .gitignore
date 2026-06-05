@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Audio / temp files (generated during analysis)
+*.mp3
+*.wav
+*.webm
+*.m4a
+temp_audio/
+
+# PDF temp files
+*.pdf
+!app/output/templates/
+
+# Analysis cache
+.cache/
+
+# Environment
+.env
+.env.local
+
+# Git
+*.orig
