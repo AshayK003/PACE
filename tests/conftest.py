@@ -9,6 +9,16 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
+@pytest.fixture(autouse=True)
+def _create_dummy_audio_files():
+    dummy_files = ["audio.mp3", "podcast.mp3"]
+    for fname in dummy_files:
+        Path(fname).touch()
+    yield
+    for fname in dummy_files:
+        Path(fname).unlink(missing_ok=True)
+
+
 # ── Sample Content Fixtures ──────────────────────────────────────────────────
 
 @pytest.fixture
@@ -26,7 +36,7 @@ by up to 40%. This is why semantic chunking outperforms simple character-splitti
 @pytest.fixture
 def sample_long_text() -> str:
     paragraphs = []
-    for i in range(20):
+    for i in range(50):
         paragraphs.append(
             f"Paragraph {i + 1}. This is a sample paragraph containing enough text "
             "to test chunking behavior across multiple semantic units. "

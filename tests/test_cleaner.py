@@ -64,7 +64,7 @@ class TestCleaner:
         assert "03:45" not in cleaned
         assert "06:20" not in cleaned
         assert "Welcome to the presentation" in cleaned
-        assert "consider the problem" in cleaned
+        assert "discuss the problem" in cleaned
 
     def test_remove_timestamps_preserves_text(self, sample_text_with_timestamps):
         """Removing timestamps should not remove the text that follows."""

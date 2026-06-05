@@ -14,6 +14,7 @@ class TestBaseIngestor:
 
     def test_base_ingestor_interface_enforced(self):
         """Subclasses must implement ingest() and validate()."""
+        from app.ingestors.base import BaseIngestor
         with pytest.raises(TypeError):
             class BadIngestor(BaseIngestor):
                 pass
@@ -169,9 +170,13 @@ class TestPDFIngestor:
         assert result["metadata"]["tables_supplemented"] is True
 
     @patch("pymupdf4llm.to_markdown")
-    def test_fallback_to_pypdf(self, mock_pymupdf):
+    @patch("pypdf.PdfReader")
+    def test_fallback_to_pypdf(self, mock_pdfreader, mock_pymupdf):
         """When PyMuPDF4LLM fails, should fall back to pypdf."""
         mock_pymupdf.side_effect = Exception("Parsing error")
+        mock_page = MagicMock()
+        mock_page.extract_text.return_value = "Fallback PDF text."
+        mock_pdfreader.return_value.pages = [mock_page]
         from app.ingestors.pdf import PDFIngestor
         ing = PDFIngestor()
         result = ing.ingest("report.pdf")
@@ -230,9 +235,11 @@ class TestArticleIngestor:
         assert ing.validate("not-a-url") is False
         assert ing.validate("") is False
 
+    @patch("trafilatura.fetch_url")
     @patch("trafilatura.extract")
-    def test_extract_with_metadata(self, mock_extract, sample_article_metadata):
+    def test_extract_with_metadata(self, mock_extract, mock_fetch, sample_article_metadata):
         """Metadata should be parsed from JSON output."""
+        mock_fetch.return_value = "<html><body>Content</body></html>"
         mock_extract.side_effect = [
             "Body text.",
             '{"title": "Test", "author": "Jane"}',

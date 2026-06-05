@@ -1,0 +1,32 @@
+streamlit>=1.40.0
+openai>=2.0.0
+
+# Content Ingestion
+youtube-transcript-api>=1.0.0
+trafilatura>=2.0.0
+pymupdf4llm>=0.2.0
+pdfplumber>=0.11.0
+pypdf>=5.0.0
+# Local only (not on Streamlit Cloud)
+# opendataloader-pdf>=0.1.0
+# yt-dlp>=2026.1.0
+# faster-whisper>=1.0.0
+
+# Text Processing
+semchunk>=4.0.0
+transformers>=4.40.0
+tiktoken>=0.8.0
+
+# Output
+jinja2>=3.1.0
+fpdf2>=2.8.0
+mistletoe>=1.0.0
+
+# Quality
+guardrails-ai>=0.6.0
+
+# Utilities
+tenacity>=9.0.0
+
+# Testing
+pytest>=8.0.0

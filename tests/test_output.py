@@ -67,7 +67,7 @@ class TestMarkdownRenderer:
 
     def test_render_executive_summary_only(self, sample_report_data):
         """Executive summary template should render only summary sections."""
-        from app.output.markdown import render_executive
+        from app.output.markdown import render_executive, render_markdown
         output = render_executive(sample_report_data)
         assert isinstance(output, str)
         assert len(output) > 20

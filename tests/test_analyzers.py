@@ -83,11 +83,13 @@ class TestLLMClient:
             MagicMock(choices=[MagicMock(delta=MagicMock(content=t))])
             for t in tokens
         ]
-        client._client.chat.completions.create.return_value = mock_stream
-        collected = []
-        for token in client.send_stream("prompt", "context"):
-            collected.append(token)
-        assert len(collected) == len(tokens)
+        with MagicMock() as mock_client:
+            mock_client.chat.completions.create.return_value = mock_stream
+            client._client = mock_client
+            collected = []
+            for token in client.send_stream("prompt", "context"):
+                collected.append(token)
+            assert len(collected) == len(tokens)
 
 
 # ── Prompts Tests ────────────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ class TestPipeline:
         expected_sections = [
             "executive_summary", "key_takeaways", "detailed_analysis",
             "supporting_evidence", "frameworks", "action_items",
-            "risks", "notable_quotes", "missing_important", "final_synthesis",
+            "risks", "notable_quotes",             "missing_important", "final_synthesis",
         ]
         for section in expected_sections:
             assert section in results, f"Missing section: {section}"
