@@ -1,5 +1,6 @@
 import json
 from typing import Any
+from urllib.parse import urlparse
 
 import trafilatura
 
@@ -10,7 +11,11 @@ class ArticleIngestor(BaseIngestor):
     def validate(self, source: str) -> bool:
         if not source:
             return False
-        return source.lower().startswith(("http://", "https://"))
+        try:
+            result = urlparse(source)
+            return result.scheme in ("http", "https") and bool(result.netloc)
+        except Exception:
+            return False
 
     def ingest(self, source: str) -> dict[str, Any]:
         html = trafilatura.fetch_url(source)
@@ -26,8 +31,11 @@ class ArticleIngestor(BaseIngestor):
                 metadata = json.loads(metadata_str)
             except (json.JSONDecodeError, TypeError):
                 pass
+        title = metadata.get("title", "")
+        if not title:
+            title = source
         return {
-            "title": metadata.get("title", source),
+            "title": title,
             "text": text,
             "metadata": metadata,
         }

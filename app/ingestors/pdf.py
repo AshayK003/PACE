@@ -15,17 +15,27 @@ class PDFIngestor(BaseIngestor):
         source_path = Path(source)
         text = ""
         tables = []
+        page_count = 0
         parser_used = "pymupdf4llm"
         fallback_used = False
+
         try:
             import pymupdf4llm
             text = pymupdf4llm.to_markdown(str(source_path))
+            try:
+                import pymupdf
+                doc = pymupdf.open(str(source_path))
+                page_count = doc.page_count
+                doc.close()
+            except Exception:
+                pass
         except Exception:
             parser_used = "pypdf"
             fallback_used = True
             try:
                 import pypdf
                 reader = pypdf.PdfReader(str(source_path))
+                page_count = len(reader.pages)
                 text_parts = []
                 for page in reader.pages:
                     page_text = page.extract_text()
@@ -34,8 +44,10 @@ class PDFIngestor(BaseIngestor):
                 text = "\n\n".join(text_parts)
             except Exception:
                 pass
+
         if not text:
             raise FileNotFoundError(f"Could not extract content from: {source}")
+
         try:
             import pdfplumber
             with pdfplumber.open(str(source_path)) as pdf:
@@ -45,6 +57,7 @@ class PDFIngestor(BaseIngestor):
                         tables.extend(page_tables)
         except Exception:
             pass
+
         result: dict[str, Any] = {
             "title": source_path.name,
             "text": text,
@@ -53,6 +66,8 @@ class PDFIngestor(BaseIngestor):
                 "fallback_used": fallback_used,
             },
         }
+        if page_count:
+            result["metadata"]["page_count"] = page_count
         if tables:
             result["metadata"]["tables"] = tables
             result["metadata"]["tables_supplemented"] = True
