@@ -52,8 +52,8 @@ class LLMClient:
         self._client = OpenAI(api_key=key, base_url=self.base_url)
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=2, min=3, max=15),
     )
     def send(
         self,

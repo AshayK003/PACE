@@ -4,13 +4,16 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.config import SourceType, safe_filename
+from app.config import SourceType, safe_filename, build_export_path
 from app.output.markdown import render_markdown
 from app.output.pdf import render_pdf
+from app.output.epub import render_epub
+from app.output.obsidian import render_obsidian
 from app.ui.components import display_report, render_download_buttons, render_empty_state, show_error, show_info, show_success, show_warning
 from app.ui.sidebar import render_sidebar
 from app.analyzers.llm_client import LLMClient
 from app.analyzers.pipeline import AnalysisPipeline
+from app.analyzers.categorizer import categorize_content
 from app.processors.cleaner import clean_pipeline
 from app.processors.chunker import chunk_text
 from app.security import (
@@ -35,6 +38,12 @@ def main() -> None:
         st.session_state.md_content = None
     if "pdf_bytes" not in st.session_state:
         st.session_state.pdf_bytes = None
+    if "epub_bytes" not in st.session_state:
+        st.session_state.epub_bytes = None
+    if "obsidian_content" not in st.session_state:
+        st.session_state.obsidian_content = None
+    if "export_path" not in st.session_state:
+        st.session_state.export_path = None
 
     has_report = st.session_state.md_content and st.session_state.pdf_bytes
 
@@ -54,6 +63,8 @@ def main() -> None:
         render_download_buttons(
             st.session_state.md_content,
             st.session_state.pdf_bytes,
+            st.session_state.epub_bytes,
+            st.session_state.obsidian_content,
             filename_base=st.session_state.get("filename_base", "report"),
         )
 
@@ -105,8 +116,9 @@ def handle_source_input(source_type: SourceType) -> None:
                 result = ingestor.ingest(url.strip())
                 text = result["text"]
                 metadata = result.get("metadata", {})
+                video_title = result.get("title", "")
                 _show_preview(text, "YouTube transcript")
-                _run_analysis(text, source_type, source_url=url.strip(), metadata=metadata)
+                _run_analysis(text, source_type, source_url=url.strip(), title=video_title, metadata=metadata)
             except Exception as e:
                 show_error(sanitize_error_message(e))
 
@@ -266,12 +278,47 @@ def _run_analysis(content: str, source_type: SourceType, source_url: str = "", t
 
         st.session_state.filename_base = safe_filename(display_title)
         st.session_state.md_content = render_markdown(report_data)
+
+        status.write("\U0001f3f7\ufe0f Categorizing content...")
+        progress_bar.progress(0.88)
+        key_takeaways = results.get("key_takeaways", "")
+        topic = results.get("topic", "")
+        takeaways_list = [line.strip("- *").strip() for line in key_takeaways.strip().split("\n") if line.strip()] if isinstance(key_takeaways, str) else key_takeaways
+        cat = categorize_content(client, display_title, takeaways_list, topic)
+
+        from datetime import date as _date
+        date_str = date.today().isoformat()
+        path_info = build_export_path(cat["domain"], cat["sub_topic"], cat["slug"], date_str)
+        st.session_state.export_path = {
+            "domain": cat["domain"],
+            "sub_topic": cat["sub_topic"],
+            "slug": cat["slug"],
+            "date": date_str,
+            "folder": path_info["folder"],
+            "full_path": path_info["full_path"],
+        }
+        category = f"{cat['domain']}/{cat['sub_topic']}"
+        vault_path = f"{path_info['full_path']}.md"
+
         st.session_state.pdf_bytes = render_pdf(
             st.session_state.md_content,
             title=display_title,
             source_type=source_type.value,
             source_url=source_url or "",
             date_analyzed=date.today().isoformat(),
+        )
+        st.session_state.epub_bytes = render_epub(
+            st.session_state.md_content,
+            title=display_title,
+        )
+        st.session_state.obsidian_content = render_obsidian(
+            st.session_state.md_content,
+            title=display_title,
+            source_type=source_type.value,
+            source_url=source_url or "",
+            date_analyzed=date.today().isoformat(),
+            category=category,
+            vault_path=vault_path,
         )
 
         progress_bar.progress(1.0)

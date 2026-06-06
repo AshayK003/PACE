@@ -1,3 +1,4 @@
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -98,36 +99,43 @@ class AnalysisPipeline:
         effective_context = self._truncate_if_needed(context)
 
         if progress_callback:
-            progress_callback("batches", 0.05)
+            progress_callback("batch_a", 0.05)
+        try:
+            self.results.update(self._run_batch_a(effective_context))
+        except Exception:
+            for s in _BATCH_A_SECTIONS:
+                self.results[s] = f"[Analysis failed for {s}]"
 
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            futures = {
-                executor.submit(self._run_batch_a, effective_context): "batch_a",
-                executor.submit(self._run_batch_b, effective_context): "batch_b",
-                executor.submit(self._run_batch_c, effective_context): "batch_c",
-            }
-            for future in as_completed(futures):
-                batch_name = futures[future]
-                try:
-                    batch_results = future.result()
-                    self.results.update(batch_results)
-                except Exception:
-                    for section in {
-                        "batch_a": _BATCH_A_SECTIONS,
-                        "batch_b": _BATCH_B_SECTIONS,
-                        "batch_c": _BATCH_C_SECTIONS,
-                    }[batch_name]:
-                        self.results[section] = f"[Analysis failed for {section}]"
+        time.sleep(2)
 
         if progress_callback:
-            progress_callback("extraction", 0.60)
+            progress_callback("batch_b", 0.30)
+        try:
+            self.results.update(self._run_batch_b(effective_context))
+        except Exception:
+            for s in _BATCH_B_SECTIONS:
+                self.results[s] = f"[Analysis failed for {s}]"
+
+        time.sleep(2)
+
+        if progress_callback:
+            progress_callback("batch_c", 0.55)
+        try:
+            self.results.update(self._run_batch_c(effective_context))
+        except Exception:
+            for s in _BATCH_C_SECTIONS:
+                self.results[s] = f"[Analysis failed for {s}]"
+
+        if progress_callback:
+            progress_callback("extraction", 0.75)
 
         for step in self.steps:
             if step.name in _DEPENDENT_SECTIONS:
                 if progress_callback:
-                    progress_callback(step.name, 0.65 + 0.15 * (step.order - 8))
+                    progress_callback(step.name, 0.80 + 0.10 * (step.order - 8))
                 result = self._run_step_safe(step, effective_context)
                 self.results[step.name] = result
+                time.sleep(1)
 
         if progress_callback:
             progress_callback("complete", 1.0)

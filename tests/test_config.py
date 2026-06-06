@@ -70,3 +70,41 @@ class TestSourceType:
         assert SourceType("YouTube") == SourceType.YOUTUBE
         assert SourceType("PDF") == SourceType.PDF
         assert SourceType("Text") == SourceType.TEXT
+
+
+class TestBuildExportPath:
+    def test_basic_path(self):
+        from app.config import build_export_path
+        result = build_export_path("Tech", "AI", "transformer_explained", "2026-06-06")
+        assert result["folder"] == "Tech/AI"
+        assert result["filename"] == "2026-06-06_transformer_explained"
+        assert result["full_path"] == "Tech/AI/2026-06-06_transformer_explained"
+
+    def test_invalid_domain_defaults_to_other(self):
+        from app.config import build_export_path
+        result = build_export_path("InvalidDomain", "Sub", "slug", "2026-01-01")
+        assert result["folder"] == "Other/Sub"
+
+    def test_empty_sub_topic_defaults_to_unsorted(self):
+        from app.config import build_export_path
+        result = build_export_path("Tech", "", "slug", "2026-01-01")
+        assert result["folder"] == "Tech/Unsorted"
+
+    def test_empty_slug_defaults_to_report(self):
+        from app.config import build_export_path
+        result = build_export_path("Tech", "AI", "", "2026-01-01")
+        assert result["filename"] == "2026-01-01_report"
+
+    def test_special_chars_stripped(self):
+        from app.config import build_export_path
+        result = build_export_path("Finance", "Crypto & Blockchain", "btc@2026!", "2026-06-06")
+        assert "Crypto" in result["folder"]
+        assert "&" not in result["folder"]
+        assert "@" not in result["filename"]
+        assert "!" not in result["filename"]
+
+    def test_all_valid_domains(self):
+        from app.config import build_export_path
+        for domain in ["Tech", "Business", "Science", "Health", "Education", "Culture", "Finance", "Politics", "Sports", "Other"]:
+            result = build_export_path(domain, "Sub", "slug", "2026-01-01")
+            assert result["folder"].startswith(domain + "/")

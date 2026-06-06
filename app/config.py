@@ -38,3 +38,27 @@ def safe_filename(title: str, max_len: int = 60) -> str:
     if len(name) > max_len:
         name = name[:max_len].rstrip("_")
     return name
+
+
+_DOMAINS = {
+    "Tech", "Business", "Science", "Health", "Education",
+    "Culture", "Finance", "Politics", "Sports", "Other",
+}
+
+
+def build_export_path(
+    domain: str,
+    sub_topic: str,
+    slug: str,
+    date_str: str,
+) -> dict:
+    if domain not in _DOMAINS:
+        domain = "Other"
+    sub_topic = re.sub(r"[^a-zA-Z0-9\s_-]", "", sub_topic).strip() or "Unsorted"
+    sub_topic = re.sub(r"\s+", "_", sub_topic)
+    slug = re.sub(r"[^a-z0-9_-]", "", slug.lower().strip()) or "report"
+
+    folder = f"{domain}/{sub_topic}"
+    filename = f"{date_str}_{slug}"
+    full_path = f"{folder}/{filename}"
+    return {"folder": folder, "filename": filename, "full_path": full_path}

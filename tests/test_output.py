@@ -354,3 +354,171 @@ class TestPDFRenderer:
             assert result.startswith(expected_stripped)
         else:
             assert not result
+
+
+# ── EPUB Rendering Tests ─────────────────────────────────────────────────────
+
+class TestEPUBRenderer:
+    def test_render_epub_returns_bytes(self):
+        from app.output.epub import render_epub
+        result = render_epub("# Title\n\nBody text here.")
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    def test_epub_starts_with_zip_magic(self):
+        from app.output.epub import render_epub
+        result = render_epub("# Title\n\nBody text here.")
+        assert result[:2] == b"PK"
+
+    def test_epub_contains_title(self):
+        from app.output.epub import render_epub
+        import zipfile
+        result = render_epub("# My Report\n\nContent.", title="My Report")
+        with zipfile.ZipFile(__import__("io").BytesIO(result)) as zf:
+            names = zf.namelist()
+            assert any("chapter1.xhtml" in n for n in names)
+            content_opf = zf.read("EPUB/content.opf").decode()
+            assert "My Report" in content_opf
+
+    def test_epub_with_empty_content(self):
+        from app.output.epub import render_epub
+        result = render_epub("")
+        assert isinstance(result, bytes)
+        assert len(result) > 0
+
+    def test_epub_with_tables(self):
+        from app.output.epub import render_epub
+        md = "# Title\n\n| Col A | Col B |\n|-------|-------|\n| 1 | 2 |"
+        result = render_epub(md)
+        assert isinstance(result, bytes)
+
+    def test_epub_with_unicode(self):
+        from app.output.epub import render_epub
+        md = "# 中文标题\n\nÜnïcödé content with émojis 🎉"
+        result = render_epub(md)
+        assert isinstance(result, bytes)
+
+    def test_epub_with_code_blocks(self):
+        from app.output.epub import render_epub
+        md = "# Title\n\n```python\nprint('hello')\n```"
+        result = render_epub(md)
+        assert isinstance(result, bytes)
+
+    def test_epub_strips_front_matter(self):
+        from app.output.epub import render_epub
+        import zipfile
+        md = "---\ntitle: Skipped\n---\n\n# Actual Title\n\nBody content."
+        result = render_epub(md, title="Test")
+        with zipfile.ZipFile(__import__("io").BytesIO(result)) as zf:
+            chapter = zf.read("EPUB/chapter1.xhtml").decode()
+            assert "Actual Title" in chapter
+            content_opf = zf.read("EPUB/content.opf").decode()
+            assert "Skipped" not in content_opf
+
+    def test_epub_saves_to_file(self, temp_output_dir):
+        from app.output.epub import render_epub
+        result = render_epub("# Title\n\nContent.")
+        path = temp_output_dir / "test.epub"
+        path.write_bytes(result)
+        assert path.exists()
+        assert path.stat().st_size > 0
+
+
+# ── Obsidian Rendering Tests ─────────────────────────────────────────────────
+
+class TestObsidianRenderer:
+    def test_render_obsidian_has_frontmatter(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("# Report\n\nBody.", title="Report")
+        assert result.startswith("---\n")
+        assert result.count("---") >= 2
+
+    def test_obsidian_contains_title(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("# Report\n\nBody.", title="My Analysis")
+        assert "title: My Analysis" in result
+
+    def test_obsidian_contains_tags(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("# Report\n\nBody.", title="Report", source_type="YouTube")
+        assert "tags:" in result
+        assert "pace" in result
+        assert "youtube" in result
+
+    def test_obsidian_contains_source_url(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian(
+            "# Report\n\nBody.",
+            title="Report",
+            source_url="https://example.com/article",
+        )
+        assert "source_url: https://example.com/article" in result
+
+    def test_obsidian_contains_date(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian(
+            "# Report\n\nBody.",
+            title="Report",
+            date_analyzed="2025-06-05",
+        )
+        assert "date: 2025-06-05" in result
+
+    def test_obsidian_aliases(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("# Report\n\nBody.", title="My Report")
+        assert "aliases:" in result
+        assert "My Report" in result
+
+    def test_obsidian_strips_existing_frontmatter(self):
+        from app.output.obsidian import render_obsidian
+        md = "---\ntitle: old\n---\n\n# New Title\n\nBody."
+        result = render_obsidian(md, title="New Title")
+        assert "title: New Title" in result
+        assert "title: old" not in result
+
+    def test_obsidian_yaml_special_chars(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("# Report\n\nBody.", title="Report: A {Test}")
+        assert 'title: "Report: A {Test}"' in result
+
+    def test_obsidian_with_empty_content(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("", title="Empty")
+        assert result.startswith("---\n")
+
+    def test_obsidian_preserves_body(self):
+        from app.output.obsidian import render_obsidian
+        body = "# Report\n\nThis is the analysis body."
+        result = render_obsidian(body, title="Report")
+        assert "This is the analysis body." in result
+
+    def test_obsidian_contains_category(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian(
+            "# Report\n\nBody.", title="Report", category="Tech/AI",
+        )
+        assert "category: Tech/AI" in result
+
+    def test_obsidian_contains_vault_path(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian(
+            "# Report\n\nBody.", title="Report",
+            vault_path="Tech/AI/2026-06-06_report.md",
+        )
+        assert "vault_path:" in result
+        assert "Tech/AI/2026-06-06_report.md" in result
+
+    def test_obsidian_enriches_tags_with_category(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian(
+            "# Report\n\nBody.", title="Report",
+            source_type="YouTube", category="Tech/AI",
+        )
+        assert "tech" in result
+        assert "ai" in result
+
+    def test_obsidian_no_category_no_vault_path(self):
+        from app.output.obsidian import render_obsidian
+        result = render_obsidian("# Report\n\nBody.", title="Report")
+        assert "category:" not in result
+        assert "vault_path:" not in result

@@ -20,9 +20,6 @@ Adapt your analysis style to the content type:
 ## Enhancement Rules
 Group related ideas, create clearer structure, condense repetitive explanations, convert complex explanations into simple language, convert scattered insights into organized frameworks, highlight relationships between concepts.
 
-## Confidence Assessment
-Tag major claims: [High] explicitly stated and supported, [Medium] reasonably supported but partially inferred, [Low] speculative or weakly supported.
-
 ## Token Efficiency
 Prefer concise wording, bullet points, hierarchical structure, logical grouping. Avoid fluff and redundant phrasing.
 
@@ -41,7 +38,7 @@ Executive Summary:"""
 ALL_PROMPTS["executive_summary"] = EXECUTIVE_SUMMARY_PROMPT
 
 KEY_TAKEAWAYS_PROMPT = """Extract the 3-7 highest-priority insights from this content.
-Each takeaway should be a single clear statement. Prioritize insights that change how the reader thinks or act. Include confidence tags where applicable: [High] explicitly stated, [Medium] inferred, [Low] speculative.
+Each takeaway should be a single clear statement. Prioritize insights that change how the reader thinks or act.
 
 Content:
 __CONTENT__
@@ -128,7 +125,7 @@ BATCH_A_PROMPT = """Analyze the following content and produce TWO separate secti
 Write 5-10 high-value bullet points summarizing the content. Adapt to content type: for academic work, summarize findings and methodology; for transcripts, capture the speaker's core message; for how-to content, state what the reader will learn; for news, state what happened and why it matters.
 
 ===KEY_TAKEAWAYS===
-Write 3-7 highest-priority insights, each as a single clear statement. Include confidence tags: [High] for explicitly stated facts, [Medium] for inferred insights, [Low] for speculative points.
+Write 3-7 highest-priority insights, each as a single clear statement.
 
 Here is the content to analyze:
 

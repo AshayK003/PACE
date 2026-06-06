@@ -1,6 +1,7 @@
 import re
 from typing import Any
 
+import httpx
 import youtube_transcript_api
 
 from app.ingestors.base import BaseIngestor
@@ -50,6 +51,9 @@ class YouTubeIngestor(BaseIngestor):
         video_id = self._extract_video_id(source)
         if not video_id:
             raise ValueError(f"Could not extract video ID from: {source}")
+
+        title = self._fetch_title(video_id)
+
         api = youtube_transcript_api.YouTubeTranscriptApi()
         language_codes = ["en", "en-GB", "en-US", "hi", "auto"]
         transcript = None
@@ -87,7 +91,7 @@ class YouTubeIngestor(BaseIngestor):
         segments = list(transcript)
         text = " ".join(self._get_segment_text(seg) for seg in segments)
         return {
-            "title": f"YouTube Video ({video_id})",
+            "title": title or f"YouTube Video ({video_id})",
             "text": text,
             "metadata": {
                 "video_id": video_id,
@@ -96,3 +100,15 @@ class YouTubeIngestor(BaseIngestor):
                 "segments": len(segments),
             },
         }
+
+    def _fetch_title(self, video_id: str) -> str:
+        try:
+            url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            with httpx.Client(timeout=5) as client:
+                resp = client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data.get("title", "")
+        except Exception:
+            pass
+        return ""
