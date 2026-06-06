@@ -2,7 +2,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -123,54 +123,6 @@ def sample_report_data() -> dict:
 
 
 @pytest.fixture
-def mock_youtube_transcript():
-    with patch("youtube_transcript_api.YouTubeTranscriptApi") as mock:
-        instance = mock.return_value
-        instance.fetch.return_value = [
-            {"text": "Test transcript line 1", "duration": 2.0, "offset": 0},
-            {"text": "Test transcript line 2", "duration": 3.0, "offset": 2.0},
-        ]
-        yield mock
-
-
-@pytest.fixture
-def mock_trafilatura():
-    with patch("trafilatura.extract") as mock_extract:
-        with patch("trafilatura.fetch_url") as mock_fetch:
-            mock_fetch.return_value = "<html><body><p>Test article content.</p></body></html>"
-            mock_extract.return_value = "Test article content."
-            yield {"fetch": mock_fetch, "extract": mock_extract}
-
-
-@pytest.fixture
-def mock_pymupdf4llm():
-    with patch("pymupdf4llm.to_markdown") as mock:
-        mock.return_value = "# Test PDF\n\nThis is extracted PDF content.\n\n| Col1 | Col2 |\n|------|------|\n| A    | B    |"
-        yield mock
-
-
-@pytest.fixture
-def mock_pdfplumber():
-    with patch("pdfplumber.open") as mock:
-        mock_page = MagicMock()
-        mock_page.extract_tables.return_value = [["A", "B"], ["C", "D"]]
-        mock.return_value.__enter__.return_value.pages = [mock_page]
-        yield mock
-
-
-@pytest.fixture
-def mock_whisper():
-    with patch("faster_whisper.WhisperModel") as mock:
-        instance = mock.return_value
-        segment = MagicMock()
-        segment.text = "Test transcription output."
-        segment.start = 0.0
-        segment.end = 5.0
-        instance.transcribe.return_value = ([segment], None)
-        yield mock
-
-
-@pytest.fixture
 def mock_llm_response():
     """Mock an OpenAI chat completions response."""
     mock = MagicMock()
@@ -181,16 +133,6 @@ def mock_llm_response():
     mock.usage.completion_tokens = 50
     mock.usage.total_tokens = 150
     return mock
-
-
-@pytest.fixture
-def mock_openai_client():
-    with patch("openai.OpenAI") as mock:
-        instance = mock.return_value
-        instance.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content="Mock analysis output."))]
-        )
-        yield mock
 
 
 # ── Temp Directory Fixtures ──────────────────────────────────────────────────

@@ -35,13 +35,11 @@ def _add_overlap(
         prev = chunks[i - 1]
         words = prev.split()
         carry = []
-        carry_tokens = 0
         for word in reversed(words):
             candidate = " ".join([word] + carry) if carry else word
             if token_counter(candidate) > overlap:
                 break
             carry.insert(0, word)
-            carry_tokens = token_counter(" ".join(carry))
         if carry:
             result.append(" ".join(carry) + " " + chunks[i])
         else:

@@ -242,7 +242,7 @@ class TestArticleIngestor:
         from app.ingestors.article import ArticleIngestor
         ing = ArticleIngestor()
         assert ing.validate("https://example.com/article") is True
-        assert ing.validate("http://blog.example.org/post.html") is True
+        assert ing.validate("https://github.com/README.md") is True
         assert ing.validate("not-a-url") is False
         assert ing.validate("") is False
 

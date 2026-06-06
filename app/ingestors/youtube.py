@@ -4,11 +4,14 @@ from typing import Any
 import youtube_transcript_api
 
 from app.ingestors.base import BaseIngestor
+from app.security import is_safe_url
 
 
 class YouTubeIngestor(BaseIngestor):
     def validate(self, source: str) -> bool:
         if not source:
+            return False
+        if not is_safe_url(source):
             return False
         patterns = [
             r"youtube\.com/watch\?",

@@ -98,6 +98,49 @@ class TestLLMClient:
             assert len(collected) == len(tokens)
 
 
+class TestResponseCache:
+    def test_cache_returns_none_on_miss(self):
+        from app.analyzers.llm_client import ResponseCache
+        cache = ResponseCache()
+        assert cache.get("m", "sys", "user") is None
+
+    def test_cache_hit_after_put(self):
+        from app.analyzers.llm_client import ResponseCache
+        cache = ResponseCache()
+        cache.put("m", "sys", "user", "result")
+        assert cache.get("m", "sys", "user") == "result"
+
+    def test_cache_evicts_oldest_at_max(self):
+        from app.analyzers.llm_client import ResponseCache
+        cache = ResponseCache(max_size=2)
+        cache.put("m", "s1", "u1", "r1")
+        cache.put("m", "s2", "u2", "r2")
+        cache.put("m", "s3", "u3", "r3")
+        assert cache.get("m", "s1", "u1") is None
+        assert cache.get("m", "s2", "u2") == "r2"
+        assert cache.get("m", "s3", "u3") == "r3"
+
+    def test_cache_differentiates_by_model(self):
+        from app.analyzers.llm_client import ResponseCache
+        cache = ResponseCache()
+        cache.put("model-a", "sys", "user", "result-a")
+        cache.put("model-b", "sys", "user", "result-b")
+        assert cache.get("model-a", "sys", "user") == "result-a"
+        assert cache.get("model-b", "sys", "user") == "result-b"
+
+    def test_cache_skips_cached_when_same_prompt(self):
+        from app.analyzers.llm_client import LLMClient, _response_cache
+        client = LLMClient()
+        client._client = MagicMock()
+        client._client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="cached output"))]
+        )
+        _response_cache.put(client.model, "sys", "user", "cached output")
+        result = client.send("sys", "user")
+        assert result == "cached output"
+        client._client.chat.completions.create.assert_not_called()
+
+
 # ── Prompts Tests ────────────────────────────────────────────────────────────
 
 class TestPrompts:

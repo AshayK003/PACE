@@ -5,8 +5,11 @@ primaryColor = "#4da6ff"
 [server]
 maxUploadSize = 50
 maxMessageSize = 200
-enableCORS = false
 enableXsrfProtection = true
+headless = true
 
 [browser]
 gatherUsageStats = false
+
+[runner]
+magicEnabled = false

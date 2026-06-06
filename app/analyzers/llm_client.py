@@ -1,3 +1,6 @@
+import hashlib
+import time
+from collections import OrderedDict
 from typing import Generator
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -6,11 +9,46 @@ from openai import OpenAI
 from app.config import BASE_URL, MODEL_NAME, get_api_key
 
 
+class ResponseCache:
+    """LRU cache for LLM responses. Key = hash of model + prompt pair."""
+
+    def __init__(self, max_size: int = 50, ttl: int = 3600):
+        self._cache: OrderedDict[str, tuple[str, float]] = OrderedDict()
+        self._max_size = max_size
+        self._ttl = ttl
+
+    def get(self, model: str, system_prompt: str, user_message: str) -> str | None:
+        key = self._make_key(model, system_prompt, user_message)
+        if key in self._cache:
+            result, ts = self._cache[key]
+            if time.time() - ts < self._ttl:
+                self._cache.move_to_end(key)
+                return result
+            del self._cache[key]
+        return None
+
+    def put(self, model: str, system_prompt: str, user_message: str, response: str) -> None:
+        key = self._make_key(model, system_prompt, user_message)
+        if key in self._cache:
+            del self._cache[key]
+        self._cache[key] = (response, time.time())
+        if len(self._cache) > self._max_size:
+            self._cache.popitem(last=False)
+
+    @staticmethod
+    def _make_key(model: str, system_prompt: str, user_message: str) -> str:
+        raw = f"{model}:{system_prompt}:{user_message}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+
+_response_cache = ResponseCache()
+
+
 class LLMClient:
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, base_url: str | None = None, model: str | None = None):
         key = api_key or get_api_key()
-        self.base_url = BASE_URL
-        self.model = MODEL_NAME
+        self.base_url = base_url or BASE_URL
+        self.model = model or MODEL_NAME
         self._client = OpenAI(api_key=key, base_url=self.base_url)
 
     @retry(
@@ -24,6 +62,10 @@ class LLMClient:
         temperature: float = 0.3,
         max_tokens: int = 4000,
     ) -> str:
+        cached = _response_cache.get(self.model, system_prompt, user_message)
+        if cached is not None:
+            return cached
+
         response = self._client.chat.completions.create(
             model=self.model,
             messages=[
@@ -33,7 +75,9 @@ class LLMClient:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return response.choices[0].message.content or ""
+        result = response.choices[0].message.content or ""
+        _response_cache.put(self.model, system_prompt, user_message, result)
+        return result
 
     def translate_text(self, text: str, source_language: str, target_language: str = "English") -> str:
         if not text.strip():

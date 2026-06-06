@@ -1,5 +1,4 @@
 import re
-from typing import Any
 
 _SECTION_DELIMITER = re.compile(r"^===([A-Z_]+)===$", re.MULTILINE)
 

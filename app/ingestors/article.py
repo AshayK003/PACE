@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import trafilatura
 
 from app.ingestors.base import BaseIngestor
+from app.security import is_safe_url
 
 
 class ArticleIngestor(BaseIngestor):
@@ -13,11 +14,19 @@ class ArticleIngestor(BaseIngestor):
             return False
         try:
             result = urlparse(source)
-            return result.scheme in ("http", "https") and bool(result.netloc)
+            if result.scheme not in ("http", "https"):
+                return False
+            if not bool(result.netloc):
+                return False
+            if not is_safe_url(source):
+                return False
+            return True
         except Exception:
             return False
 
     def ingest(self, source: str) -> dict[str, Any]:
+        if not is_safe_url(source):
+            raise ValueError(f"URL is blocked for security reasons: {source}")
         html = trafilatura.fetch_url(source)
         if html is None:
             raise ValueError(f"Could not fetch URL: {source}")

@@ -19,6 +19,8 @@ def _build_filler_pattern() -> Pattern:
 _FILLER_PATTERN = _build_filler_pattern()
 _REPEATED_PUNCT_PATTERN = re.compile(r"[,]{2,}\s*[,]*")
 _MULTI_SPACE_PATTERN = re.compile(r"[ \t]{2,}")
+_TIMESTAMP_PATTERN = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\s*", re.MULTILINE)
+_URL_PATTERN = re.compile(r"https?://\S+")
 
 
 def remove_fillers(text: str) -> str:
@@ -60,15 +62,13 @@ def normalize_whitespace(text: str) -> str:
 def remove_timestamps(text: str) -> str:
     if not text:
         return text
-    pattern = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\s*", re.MULTILINE)
-    return pattern.sub("", text)
+    return _TIMESTAMP_PATTERN.sub("", text)
 
 
 def remove_urls(text: str) -> str:
     if not text:
         return text
-    pattern = re.compile(r"https?://\S+")
-    return pattern.sub("", text)
+    return _URL_PATTERN.sub("", text)
 
 
 def clean_pipeline(text: str) -> str:

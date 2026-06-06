@@ -13,6 +13,17 @@ from app.analyzers.llm_client import LLMClient
 from app.analyzers.pipeline import AnalysisPipeline
 from app.processors.cleaner import clean_pipeline
 from app.processors.chunker import chunk_text
+from app.security import (
+    is_safe_url,
+    validate_file_magic,
+    sanitize_error_message,
+    sanitize_input,
+    detect_prompt_injection,
+    check_llm_rate_limit,
+)
+
+_MAX_FILE_SIZE_MB = 50
+_MAX_FILE_BYTES = _MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 def main() -> None:
@@ -20,8 +31,6 @@ def main() -> None:
     st.title("PACE")
     st.caption("Precise Analysis and Compilation of Extracts")
 
-    if "report_data" not in st.session_state:
-        st.session_state.report_data = None
     if "md_content" not in st.session_state:
         st.session_state.md_content = None
     if "pdf_bytes" not in st.session_state:
@@ -50,6 +59,8 @@ def main() -> None:
 
 
 def _validate_url(url: str, patterns: list[str]) -> bool:
+    if not is_safe_url(url):
+        return False
     return any(p in url for p in patterns)
 
 
@@ -97,15 +108,23 @@ def handle_source_input(source_type: SourceType) -> None:
                 _show_preview(text, "YouTube transcript")
                 _run_analysis(text, source_type, source_url=url.strip(), metadata=metadata)
             except Exception as e:
-                show_error(f"Could not fetch transcript: {e}")
+                show_error(sanitize_error_message(e))
 
     elif source_type == SourceType.PDF:
         uploaded = st.file_uploader("Upload a PDF file", type=["pdf"])
         if uploaded:
+            if uploaded.size > _MAX_FILE_BYTES:
+                show_error(f"File too large ({uploaded.size / 1024 / 1024:.1f} MB). Maximum is {_MAX_FILE_SIZE_MB} MB.")
+                return
             show_info(f"File: **{uploaded.name}** ({uploaded.size / 1024:.0f} KB)")
         if uploaded and st.button("Analyze", key="analyze_pdf", type="primary"):
+            file_bytes = uploaded.getvalue()
+            is_valid, reason = validate_file_magic(file_bytes, ".pdf")
+            if not is_valid:
+                show_error(f"Invalid PDF file: {reason}")
+                return
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                tmp.write(uploaded.getvalue())
+                tmp.write(file_bytes)
                 tmp_path = tmp.name
             try:
                 from app.ingestors.pdf import PDFIngestor
@@ -117,7 +136,7 @@ def handle_source_input(source_type: SourceType) -> None:
                 _show_preview(result["text"], "PDF content")
                 _run_analysis(result["text"], source_type, title=uploaded.name)
             except Exception as e:
-                show_error(f"Could not process PDF: {e}")
+                show_error(sanitize_error_message(e))
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
 
@@ -137,7 +156,7 @@ def handle_source_input(source_type: SourceType) -> None:
             from app.ingestors.article import ArticleIngestor
             ingestor = ArticleIngestor()
             if not ingestor.validate(url.strip()):
-                show_error("Invalid URL. Make sure it starts with http:// or https://.")
+                show_error("Invalid URL. Make sure it starts with http:// or https:// and points to a public website.")
                 return
             try:
                 result = ingestor.ingest(url.strip())
@@ -147,15 +166,24 @@ def handle_source_input(source_type: SourceType) -> None:
                 _show_preview(result["text"], "Article content")
                 _run_analysis(result["text"], source_type, source_url=url.strip())
             except Exception as e:
-                show_error(f"Could not fetch article: {e}")
+                show_error(sanitize_error_message(e))
 
     elif source_type == SourceType.AUDIO:
         uploaded = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a", "ogg"])
         if uploaded:
+            if uploaded.size > _MAX_FILE_BYTES:
+                show_error(f"File too large ({uploaded.size / 1024 / 1024:.1f} MB). Maximum is {_MAX_FILE_SIZE_MB} MB.")
+                return
             show_info(f"File: **{uploaded.name}** ({uploaded.size / 1024:.0f} KB)")
         if uploaded and st.button("Analyze", key="analyze_audio", type="primary"):
+            file_bytes = uploaded.getvalue()
+            ext = Path(uploaded.name).suffix.lower()
+            is_valid, reason = validate_file_magic(file_bytes, ext)
+            if not is_valid:
+                show_error(f"Invalid audio file: {reason}")
+                return
             with tempfile.NamedTemporaryFile(suffix=Path(uploaded.name).suffix, delete=False) as tmp:
-                tmp.write(uploaded.getvalue())
+                tmp.write(file_bytes)
                 tmp_path = tmp.name
             try:
                 from app.ingestors.audio import AudioIngestor
@@ -168,16 +196,28 @@ def handle_source_input(source_type: SourceType) -> None:
                 _show_preview(text, "Transcribed audio")
                 _run_analysis(text, source_type, title=uploaded.name)
             except Exception as e:
-                show_error(f"Could not transcribe audio: {e}")
+                show_error(sanitize_error_message(e))
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
 
 
 def _run_analysis(content: str, source_type: SourceType, source_url: str = "", title: str = "", metadata: dict | None = None) -> None:
+    allowed, retry_after = check_llm_rate_limit()
+    if not allowed:
+        show_error(f"Rate limit exceeded. Please wait {retry_after:.0f} seconds before trying again.")
+        return
+
+    if detect_prompt_injection(content):
+        show_warning("The submitted content contains patterns that may be attempting to manipulate the AI. Proceeding with standard analysis.")
+
+    content = sanitize_input(content)
+
     status = st.status("Starting analysis...", expanded=True)
     progress_bar = st.progress(0.0)
     api_key = st.session_state.get("api_key") or None
-    client = LLMClient(api_key=api_key)
+    base_url = st.session_state.get("base_url") or None
+    model_name = st.session_state.get("model_name") or None
+    client = LLMClient(api_key=api_key, base_url=base_url, model=model_name)
 
     try:
         lang = (metadata or {}).get("language", "")
@@ -224,7 +264,6 @@ def _run_analysis(content: str, source_type: SourceType, source_url: str = "", t
         }
         report_data.update(results)
 
-        st.session_state.report_data = report_data
         st.session_state.filename_base = safe_filename(display_title)
         st.session_state.md_content = render_markdown(report_data)
         st.session_state.pdf_bytes = render_pdf(
@@ -243,13 +282,8 @@ def _run_analysis(content: str, source_type: SourceType, source_url: str = "", t
     except Exception as e:
         progress_bar.empty()
         status.update(label="Analysis failed", state="error")
-        msg = str(e)
-        if "401" in msg or "unauthorized" in msg.lower() or "api key" in msg.lower():
-            status.write("Authentication error. Check your API key in Settings.")
-        elif "timeout" in msg.lower() or "timed out" in msg.lower():
-            status.write("The request timed out. The content may be too long. Try a smaller chunk size.")
-        else:
-            status.write(f"Error: {msg}")
+        msg = sanitize_error_message(e)
+        status.write(f"Error: {msg}")
         show_error("Analysis failed. See the status panel above for details.")
 
 

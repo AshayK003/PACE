@@ -14,7 +14,6 @@ _MAX_CONTENT_CHARS = 50000
 _BATCH_A_SECTIONS = ["executive_summary", "key_takeaways"]
 _BATCH_B_SECTIONS = ["detailed_analysis", "supporting_evidence"]
 _BATCH_C_SECTIONS = ["frameworks", "action_items", "risks", "notable_quotes"]
-_INDEPENDENT_SECTIONS = _BATCH_A_SECTIONS + _BATCH_B_SECTIONS + _BATCH_C_SECTIONS
 _DEPENDENT_SECTIONS = ["missing_important", "final_synthesis"]
 
 
