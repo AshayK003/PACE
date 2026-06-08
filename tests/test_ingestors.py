@@ -219,10 +219,7 @@ class TestArticleIngestor:
     def test_ingest_success(self, mock_extract, mock_fetch, sample_article_metadata):
         """Happy path: fetches and extracts article content."""
         mock_fetch.return_value = "<html><body><article>Content</article></body></html>"
-        mock_extract.side_effect = [
-            '{"title": "Test Article", "author": "Jane", "date": "2025-01-01"}',
-            "Article body content here.",
-        ]
+        mock_extract.return_value = "Article body content here."
         from app.ingestors.article import ArticleIngestor
         ing = ArticleIngestor()
         result = ing.ingest("https://example.com/article")
@@ -251,10 +248,7 @@ class TestArticleIngestor:
     def test_extract_with_metadata(self, mock_extract, mock_fetch, sample_article_metadata):
         """Metadata should be parsed from JSON output."""
         mock_fetch.return_value = "<html><body>Content</body></html>"
-        mock_extract.side_effect = [
-            "Body text.",
-            '{"title": "Test", "author": "Jane"}',
-        ]
+        mock_extract.return_value = "Body text."
         from app.ingestors.article import ArticleIngestor
         ing = ArticleIngestor()
         result = ing.ingest("https://example.com/article")
