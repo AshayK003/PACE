@@ -10,7 +10,7 @@
 
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Tests](https://img.shields.io/badge/Tests-215%20passing-00C853?style=for-the-badge&logo=pytest&logoColor=white)]()
+[![Tests](https://img.shields.io/badge/Tests-252%20passing-00C853?style=for-the-badge&logo=pytest&logoColor=white)]()
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=for-the-badge)](CONTRIBUTING.md)
 
@@ -73,9 +73,9 @@ PACE ingests content from **5 sources**, runs **10 parallel AI analyses**, and d
 
 ### 5 Input Sources
 
-- **YouTube** — transcript extraction, no API key needed
-- **PDF** — PyMuPDF4LLM + table extraction
-- **Article** — trafilatura (highest F1-score extractor)
+- **YouTube** — transcript extraction + oEmbed title, no API key needed
+- **PDF** — PyMuPDF4LLM + table extraction (pdfplumber)
+- **Article** — trafilatura + curl_cffi TLS fingerprint impersonation + paywall bypass (Wayback Machine, archive.ph, Google Cache)
 - **Audio** — faster-whisper speech-to-text (local)
 - **Raw Text** — paste and go
 
@@ -103,9 +103,9 @@ PACE ingests content from **5 sources**, runs **10 parallel AI analyses**, and d
 <tr>
 <td width="33%">
 
-### Parallel Execution
+### Sequential Batches
 
-3 concurrent LLM batches cut analysis time by **~60%** vs sequential.
+3 batches run sequentially with delays to avoid rate limits on free API tiers.
 
 </td>
 <td width="33%">
@@ -117,9 +117,9 @@ LRU cache (50 entries, 1h TTL) — re-analyze the same content instantly.
 </td>
 <td width="33%">
 
-### BYOK Support
+### BYOK + OpenCode Zen
 
-Use your own API key from **9 providers** — Gemini, Groq, Cerebras, OpenRouter, Mistral, DeepSeek, and more.
+Built-in free tier via OpenCode Zen, or use your own key from supported providers.
 
 </td>
 </tr>
@@ -136,9 +136,9 @@ DNS resolution + IP blocking prevents server-side request forgery.
 </td>
 <td width="33%">
 
-### Rate Limiting
+### 4 Export Formats
 
-30 LLM calls/min per session. Configurable per provider.
+Markdown, PDF, EPUB, and Obsidian (YAML frontmatter + vault paths).
 
 </td>
 <td width="33%">
@@ -201,15 +201,16 @@ PACE works out of the box with a built-in free tier. To use your own key:
 
 ### Supported Providers
 
-| Preset | Endpoint | Model | Free Limits |
-|:-------|:---------|:------|:------------|
-| **Gemini 2.5 Flash** | `generativelanguage.googleapis.com` | `gemini-2.5-flash` | 250 req/day |
-| **Gemini 2.5 Flash-Lite** | `generativelanguage.googleapis.com` | `gemini-2.5-flash-lite` | 1,000 req/day |
-| **Groq Llama 3.3 70B** | `api.groq.com` | `llama-3.3-70b-versatile` | 1,000 req/day |
-| **Cerebras** | `api.cerebras.ai` | `llama-3.3-70b-versatile` | 14,400 req/day |
-| **OpenRouter (free)** | `openrouter.ai` | `deepseek/deepseek-chat-v3.1:free` | 50 req/day |
-| **Mistral Small** | `api.mistral.ai` | `mistral-small-latest` | ~1B tokens/month |
-| **DeepSeek V4 Flash** | `api.deepseek.com` | `deepseek-v4-flash` | 5M tokens free |
+| Provider | Endpoint | Models |
+|:---------|:---------|:-------|
+| **OpenCode Zen** (built-in free) | `opencode.ai/zen/v1` | deepseek-v4-flash-free, deepseek-v4-flash, deepseek-v3.1, gpt-4o-mini, claude-sonnet-4, gemini-2.5-flash, llama-3.3-70b |
+| **Gemini 2.5 Flash** | `generativelanguage.googleapis.com` | `gemini-2.5-flash` |
+| **Gemini 2.5 Flash-Lite** | `generativelanguage.googleapis.com` | `gemini-2.5-flash-lite` |
+| **Groq Llama 3.3 70B** | `api.groq.com` | `llama-3.3-70b-versatile` |
+| **Cerebras** | `api.cerebras.ai` | `llama-3.3-70b-versatile` |
+| **OpenRouter (free)** | `openrouter.ai` | `deepseek/deepseek-chat-v3.1:free` |
+| **Mistral Small** | `api.mistral.ai` | `mistral-small-latest` |
+| **DeepSeek V4 Flash** | `api.deepseek.com` | `deepseek-v4-flash` |
 
 ### Environment Variables
 
@@ -227,30 +228,33 @@ Set via environment, `.env`, or `.streamlit/secrets.toml`.
 
 ```
 app/
-├── main.py                 # Streamlit entry point, tab routing
-├── config.py               # API keys, constants, safe_filename()
+├── main.py                 # Streamlit entry, wires everything together
+├── config.py               # SourceType, safe_filename, build_export_path()
 ├── security.py             # SSRF, rate limiting, input sanitization
 ├── ingestors/              # Content extraction (one per source)
 │   ├── base.py             # Abstract base class
-│   ├── youtube.py          # youtube-transcript-api
-│   ├── pdf.py              # PyMuPDF4LLM + pdfplumber
-│   ├── article.py          # trafilatura
+│   ├── youtube.py          # youtube-transcript-api + oEmbed title
+│   ├── pdf.py              # PyMuPDF4LLM + pdfplumber tables
+│   ├── article.py          # trafilatura + curl_cffi TLS impersonation + paywall bypass
 │   └── audio.py            # faster-whisper (local only)
 ├── processors/             # Text processing
 │   ├── cleaner.py          # Dedup, filler removal, URL stripping
 │   └── chunker.py          # semchunk semantic chunking
 ├── analyzers/              # LLM pipeline
-│   ├── llm_client.py       # OpenAI-compatible client + cache
-│   ├── pipeline.py         # Parallel batch execution
-│   ├── prompts.py          # All prompt templates
-│   └── parser.py           # Batched response parser
+│   ├── llm_client.py       # OpenAI-compatible client + cache + rate limiter
+│   ├── pipeline.py         # Sequential batch execution (A→B→C with delays)
+│   ├── prompts.py          # All prompt templates (8 analysis sections)
+│   ├── parser.py           # ===SECTION=== delimited response parser
+│   └── categorizer.py      # LLM-based content categorization for export paths
 ├── output/                 # Report generation
 │   ├── markdown.py         # Jinja2 → Markdown
-│   ├── pdf.py              # fpdf2 → PDF
+│   ├── pdf.py              # fpdf2 → PDF (lazy font loading)
+│   ├── epub.py             # ebooklib + mistletoe → EPUB
+│   ├── obsidian.py         # YAML frontmatter + vault paths
 │   └── templates/          # Jinja2 templates
 └── ui/                     # Streamlit components
-    ├── sidebar.py          # Settings, LLM presets
-    └── components.py       # Display helpers
+    ├── sidebar.py          # LLM config, export path settings
+    └── components.py       # Report display, download buttons
 ```
 
 ### Why these libraries?
@@ -263,6 +267,7 @@ app/
 | **fpdf2** | Pure Python PDF, no system deps |
 | **PyMuPDF4LLM** | 0.09s/page, 1GB RAM cloud-friendly |
 | **trafilatura** | Highest F1-score article extractor in benchmarks |
+| **curl_cffi** | TLS fingerprint impersonation bypasses Cloudflare/anti-bot |
 | **tenacity** | Retry with exponential backoff |
 
 ---
@@ -272,7 +277,7 @@ app/
 ## Testing
 
 ```bash
-# Run all 215 tests
+# Run all 252 tests
 pytest
 
 # Verbose
@@ -291,14 +296,15 @@ pytest --cov=app
 |:-------|:------|:---------------|
 | `test_analyzers.py` | 30 | Pipeline, prompts, batching, cache |
 | `test_security.py` | 40 | SSRF, rate limiting, injection, file magic |
-| `test_ingestors.py` | 31 | YouTube, PDF, article, audio |
-| `test_output.py` | 38 | Markdown, PDF, Unicode, tables |
+| `test_ingestors.py` | 36 | YouTube, PDF, article (curl_cffi), audio |
+| `test_output.py` | 48 | Markdown, PDF, EPUB, Obsidian, Unicode, tables |
+| `test_categorizer.py` | 8 | LLM categorization for export paths |
 | `test_cleaner.py` | 20 | Filler removal, dedup, timestamps |
 | `test_chunker.py` | 10 | Semantic chunking, boundaries |
-| `test_config.py` | 14 | Filename utils, API key loading |
+| `test_config.py` | 24 | Filename utils, API key loading, export path |
 | `test_parser.py` | 9 | Batched response parsing |
 | `test_integration.py` | 16 | End-to-end pipeline resilience |
-| **Total** | **215** | |
+| **Total** | **252** | |
 
 ---
 
@@ -353,7 +359,7 @@ We welcome contributions! Here's how:
 1. **Fork** the repo
 2. **Create** a feature branch: `git checkout -b feature/my-change`
 3. **Make** changes + add tests
-4. **Run** `pytest` — all 215 tests must pass
+4. **Run** `pytest` — all 252 tests must pass
 5. **Open** a PR with a clear description
 
 ### Quick contributions

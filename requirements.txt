@@ -25,5 +25,8 @@ ebooklib>=0.18
 # Utilities
 tenacity>=9.0.0
 
+# HTTP fetching with TLS fingerprint impersonation
+curl_cffi>=0.15.0
+
 # Testing
 pytest>=8.0.0

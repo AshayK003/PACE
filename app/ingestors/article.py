@@ -3,7 +3,7 @@ import re
 from typing import Any
 from urllib.parse import urlparse, quote
 
-import httpx
+from curl_cffi import requests as curl_requests
 import trafilatura
 
 from app.ingestors.base import BaseIngestor
@@ -11,6 +11,8 @@ from app.security import is_safe_url
 
 
 class ArticleIngestor(BaseIngestor):
+    _REQUEST_KWARGS = {"impersonate": "chrome", "timeout": 15}
+
     def validate(self, source: str) -> bool:
         if not source:
             return False
@@ -52,6 +54,15 @@ class ArticleIngestor(BaseIngestor):
         return {"title": title or source, "text": text, "metadata": {}}
 
     def _fetch_and_extract(self, url: str) -> tuple[str, str]:
+        try:
+            resp = curl_requests.get(url, **self._REQUEST_KWARGS)
+            if resp.status_code == 200 and len(resp.text) > 100:
+                text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
+                if text and len(text.strip()) > 100:
+                    return text, resp.text
+        except Exception:
+            pass
+
         html = trafilatura.fetch_url(url)
         if not html:
             return "", ""
@@ -60,40 +71,37 @@ class ArticleIngestor(BaseIngestor):
 
     def _try_wayback(self, url: str) -> tuple[str, str]:
         api = f"https://archive.org/wayback/available?url={quote(url)}"
-        with httpx.Client(timeout=10) as client:
-            resp = client.get(api)
-            if resp.status_code != 200:
-                return "", ""
-            data = resp.json()
-            snapshot = data.get("archived_snapshots", {}).get("closest", {})
-            if not snapshot or not snapshot.get("url"):
-                return "", ""
-            html = trafilatura.fetch_url(snapshot["url"])
-            if not html:
-                return "", ""
-            text = trafilatura.extract(html, output_format="txt", include_links=True) or ""
-            title = self._extract_title(html)
-            return text, title
+        resp = curl_requests.get(api, **self._REQUEST_KWARGS)
+        if resp.status_code != 200:
+            return "", ""
+        data = resp.json()
+        snapshot = data.get("archived_snapshots", {}).get("closest", {})
+        if not snapshot or not snapshot.get("url"):
+            return "", ""
+        html = trafilatura.fetch_url(snapshot["url"])
+        if not html:
+            return "", ""
+        text = trafilatura.extract(html, output_format="txt", include_links=True) or ""
+        title = self._extract_title(html)
+        return text, title
 
     def _try_archive_ph(self, url: str) -> tuple[str, str]:
         archive_url = f"https://archive.ph/newest/{url}"
-        with httpx.Client(timeout=10, follow_redirects=True) as client:
-            resp = client.get(archive_url)
-            if resp.status_code != 200:
-                return "", ""
-            text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
-            title = self._extract_title(resp.text)
-            return text, title
+        resp = curl_requests.get(archive_url, allow_redirects=True, **self._REQUEST_KWARGS)
+        if resp.status_code != 200:
+            return "", ""
+        text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
+        title = self._extract_title(resp.text)
+        return text, title
 
     def _try_google_cache(self, url: str) -> tuple[str, str]:
         cache_url = f"https://webcache.googleusercontent.com/search?q=cache:{url}"
-        with httpx.Client(timeout=10, follow_redirects=True) as client:
-            resp = client.get(cache_url)
-            if resp.status_code != 200:
-                return "", ""
-            text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
-            title = self._extract_title(resp.text)
-            return text, title
+        resp = curl_requests.get(cache_url, allow_redirects=True, **self._REQUEST_KWARGS)
+        if resp.status_code != 200:
+            return "", ""
+        text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
+        title = self._extract_title(resp.text)
+        return text, title
 
     def _extract_title(self, html: str) -> str:
         match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)

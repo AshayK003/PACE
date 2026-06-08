@@ -36,6 +36,9 @@ temp_audio/
 # Analysis cache
 .cache/
 
+# Skill evaluation artifacts
+evals/
+
 # Environment
 .env
 .env.local

@@ -214,9 +214,10 @@ class TestPDFIngestor:
 # ── Article Ingestor Tests ───────────────────────────────────────────────────
 
 class TestArticleIngestor:
+    @patch("app.ingestors.article.curl_requests.get", side_effect=Exception("curl_cffi mocked"))
     @patch("trafilatura.fetch_url")
     @patch("trafilatura.extract")
-    def test_ingest_success(self, mock_extract, mock_fetch, sample_article_metadata):
+    def test_ingest_success(self, mock_extract, mock_fetch, mock_curl, sample_article_metadata):
         """Happy path: fetches and extracts article content."""
         mock_fetch.return_value = "<html><body><article>Content</article></body></html>"
         mock_extract.return_value = "Article body content here."
@@ -225,8 +226,9 @@ class TestArticleIngestor:
         result = ing.ingest("https://example.com/article")
         assert "Article body content" in result["text"]
 
+    @patch("app.ingestors.article.curl_requests.get", side_effect=Exception("curl_cffi mocked"))
     @patch("trafilatura.fetch_url")
-    def test_ingest_fetch_failure(self, mock_fetch):
+    def test_ingest_fetch_failure(self, mock_fetch, mock_curl):
         """When fetch_url fails, should propagate error."""
         mock_fetch.side_effect = Exception("Network error")
         from app.ingestors.article import ArticleIngestor
@@ -243,9 +245,10 @@ class TestArticleIngestor:
         assert ing.validate("not-a-url") is False
         assert ing.validate("") is False
 
+    @patch("app.ingestors.article.curl_requests.get", side_effect=Exception("curl_cffi mocked"))
     @patch("trafilatura.fetch_url")
     @patch("trafilatura.extract")
-    def test_extract_with_metadata(self, mock_extract, mock_fetch, sample_article_metadata):
+    def test_extract_with_metadata(self, mock_extract, mock_fetch, mock_curl, sample_article_metadata):
         """Metadata should be parsed from JSON output."""
         mock_fetch.return_value = "<html><body>Content</body></html>"
         mock_extract.return_value = "Body text."
