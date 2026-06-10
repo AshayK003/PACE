@@ -7,6 +7,114 @@ _DOMAINS = [
     "Culture", "Finance", "Politics", "Sports", "Other",
 ]
 
+PROVIDERS = {
+    "OpenCode Zen (free)": {
+        "base_url": "",
+        "models": [
+            "deepseek-v4-flash-free",
+            "deepseek-v4-flash",
+            "deepseek-v3.1",
+            "gpt-4o-mini",
+            "gpt-4o",
+            "claude-sonnet-4",
+            "gemini-2.5-flash",
+            "llama-3.3-70b",
+        ],
+        "key_prefix": "",
+        "help": "Built-in free tier — no API key required.",
+    },
+    "Google Gemini (free)": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "models": [
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
+        ],
+        "key_prefix": "AIza",
+        "help": "1,500 req/day free. No credit card.",
+    },
+    "Groq (free)": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "models": [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "llama-4-scout-17b-16e-instruct",
+            "qwen3-32b",
+            "gpt-oss-120b",
+        ],
+        "key_prefix": "gsk_",
+        "help": "30 RPM, 14,400 RPD. Ultra-fast LPU inference.",
+    },
+    "Cerebras (free)": {
+        "base_url": "https://api.cerebras.ai/v1",
+        "models": [
+            "llama-3.3-70b",
+            "gpt-oss-120b",
+        ],
+        "key_prefix": "csk-",
+        "help": "1M tokens/day. No credit card.",
+    },
+    "OpenRouter (free)": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "models": [
+            "deepseek/deepseek-r1-0528:free",
+            "deepseek/deepseek-chat-v3.1:free",
+            "qwen/qwen3-235b-a22b:free",
+            "qwen/qwen3-coder-480b-a35b:free",
+            "meta-llama/llama-4-scout:free",
+            "meta-llama/llama-4-maverick:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "google/gemma-4-31b-it:free",
+            "nvidia/nemotron-3-super-120b-a12b:free",
+            "openai/gpt-oss-120b:free",
+            "mistralai/devstral-2512:free",
+        ],
+        "key_prefix": "sk-or-",
+        "help": "20 RPM, 50 RPD on free models. 30+ free models.",
+    },
+    "Mistral (free)": {
+        "base_url": "https://api.mistral.ai/v1",
+        "models": [
+            "mistral-small-latest",
+            "mistral-large-latest",
+        ],
+        "key_prefix": "",
+        "help": "~1B tokens/month on Experiment tier.",
+    },
+    "DeepSeek": {
+        "base_url": "https://api.deepseek.com",
+        "models": [
+            "deepseek-v4-flash",
+            "deepseek-chat",
+        ],
+        "key_prefix": "sk-",
+        "help": "Very cheap (~$0.0001/1K tokens). Long-context reasoning.",
+    },
+    "Custom (OpenAI-compatible)": {
+        "base_url": "",
+        "models": [],
+        "key_prefix": "",
+        "help": "Any OpenAI-compatible endpoint.",
+    },
+}
+
+_KEY_PREFIX_MAP = {
+    "gsk_": "Groq (free)",
+    "csk-": "Cerebras (free)",
+    "sk-or-": "OpenRouter (free)",
+    "AIza": "Google Gemini (free)",
+}
+
+
+def _detect_provider(api_key: str) -> str | None:
+    if not api_key:
+        return None
+    for prefix, provider in _KEY_PREFIX_MAP.items():
+        if api_key.startswith(prefix):
+            return provider
+    if api_key.startswith("sk-"):
+        return "DeepSeek"
+    return None
+
 
 def render_sidebar() -> None:
     with st.sidebar:
@@ -25,106 +133,61 @@ def render_sidebar() -> None:
             )
 
         with st.expander("LLM Settings", expanded=False):
-            provider = st.radio(
+            provider_names = list(PROVIDERS.keys())
+
+            current_provider = st.session_state.get("_llm_provider", provider_names[0])
+            if current_provider not in provider_names:
+                current_provider = provider_names[0]
+
+            provider = st.selectbox(
                 "Provider",
-                ["OpenCode Zen", "Other"],
-                key="llm_provider",
-                horizontal=True,
+                options=provider_names,
+                index=provider_names.index(current_provider),
+                key="_llm_provider",
+                help="Select a provider. Auto-detects from API key when possible.",
             )
 
-            if provider == "OpenCode Zen":
-                st.text_input(
-                    "API Key",
-                    type="password",
-                    key="api_key",
-                    placeholder="Optional — leave empty for env key",
-                    help="Your OpenCode Zen API key. Leave empty to use the environment variable OPENCODE_ZEN_KEY.",
-                )
-                zen_models = [
-                    "deepseek-v4-flash-free",
-                    "gemini-2.5-flash",
-                    "gemini-2.5-flash-lite",
-                    "gpt-4o-mini",
-                    "gpt-4o",
-                    "claude-3.5-sonnet",
-                    "claude-3-haiku",
-                ]
-                st.selectbox(
+            prov = PROVIDERS[provider]
+
+            api_key = st.text_input(
+                "API Key",
+                type="password",
+                key="api_key",
+                placeholder="Paste your API key — provider auto-detected",
+                help=prov["help"],
+            )
+
+            if api_key and provider == provider_names[0]:
+                detected = _detect_provider(api_key)
+                if detected and detected != provider_names[0]:
+                    st.info(f"Detected: **{detected}** — switching provider.")
+                    st.session_state["_llm_provider"] = detected
+                    st.rerun()
+
+            if prov["models"]:
+                model = st.selectbox(
                     "Model",
-                    options=zen_models,
+                    options=prov["models"],
                     key="model_name",
-                    help="Select a model from OpenCode Zen.",
+                    help="Select a model from this provider.",
                 )
-                st.session_state["base_url"] = ""
             else:
-                other_presets = {
-                    "Gemini 2.5 Flash": (
-                        "https://generativelanguage.googleapis.com/v1beta/openai/",
-                        "gemini-2.5-flash",
-                    ),
-                    "Gemini 2.5 Flash-Lite": (
-                        "https://generativelanguage.googleapis.com/v1beta/openai/",
-                        "gemini-2.5-flash-lite",
-                    ),
-                    "Groq Llama 3.3 70B": (
-                        "https://api.groq.com/openai/v1",
-                        "llama-3.3-70b-versatile",
-                    ),
-                    "Cerebras Llama 3.3 70B": (
-                        "https://api.cerebras.ai/v1",
-                        "llama-3.3-70b-versatile",
-                    ),
-                    "OpenRouter DeepSeek V3 (free)": (
-                        "https://openrouter.ai/api/v1",
-                        "deepseek/deepseek-chat-v3.1:free",
-                    ),
-                    "OpenRouter Qwen3 235B (free)": (
-                        "https://openrouter.ai/api/v1",
-                        "qwen/qwen3-235b-a22b:free",
-                    ),
-                    "Mistral Small": (
-                        "https://api.mistral.ai/v1",
-                        "mistral-small-latest",
-                    ),
-                    "DeepSeek V4 Flash": (
-                        "https://api.deepseek.com",
-                        "deepseek-v4-flash",
-                    ),
-                    "Custom (OpenAI-compatible)": ("", ""),
-                }
-
-                def _apply_other_preset():
-                    sel = st.session_state.get("_other_preset", "Gemini 2.5 Flash")
-                    url, model = other_presets.get(sel, ("", ""))
-                    st.session_state["base_url"] = url
-                    st.session_state["model_name"] = model
-
-                st.selectbox(
-                    "Preset",
-                    options=list(other_presets.keys()),
-                    key="_other_preset",
-                    on_change=_apply_other_preset,
-                    help="Auto-fills Base URL and Model. Top picks: Gemini 2.5 Flash (250/day), Groq Llama 3.3 70B (1K/day, fastest).",
+                model = st.text_input(
+                    "Model",
+                    key="model_name",
+                    placeholder="model-name",
+                    help="Enter the model name for your endpoint.",
                 )
-                st.text_input(
-                    "API Key",
-                    type="password",
-                    key="api_key",
-                    placeholder="Enter your API key",
-                    help="API key for the selected provider.",
-                )
+
+            if provider == "Custom (OpenAI-compatible)":
                 st.text_input(
                     "Base URL",
                     key="base_url",
                     placeholder="https://api.example.com/v1",
                     help="OpenAI-compatible API endpoint.",
                 )
-                st.text_input(
-                    "Model",
-                    key="model_name",
-                    placeholder="model-name",
-                    help="Model name to use.",
-                )
+            else:
+                st.session_state["base_url"] = prov["base_url"]
 
         if st.session_state.get("md_content"):
             _render_export_path_section()
