@@ -3,15 +3,24 @@ import re
 from typing import Any
 from urllib.parse import urlparse, quote
 
-from curl_cffi import requests as curl_requests
 import trafilatura
+
+try:
+    from curl_cffi import requests as curl_requests
+    _HAS_CURL_CFFI = True
+except Exception:
+    import httpx as curl_requests  # type: ignore[no-redef]
+    _HAS_CURL_CFFI = False
 
 from app.ingestors.base import BaseIngestor
 from app.security import is_safe_url
 
 
 class ArticleIngestor(BaseIngestor):
-    _REQUEST_KWARGS = {"impersonate": "chrome", "timeout": 15}
+    _REQUEST_KWARGS: dict[str, Any] = {"timeout": 15}
+    _REDIRECT_KEY = "allow_redirects" if _HAS_CURL_CFFI else "follow_redirects"
+    if _HAS_CURL_CFFI:
+        _REQUEST_KWARGS["impersonate"] = "chrome"
 
     def validate(self, source: str) -> bool:
         if not source:
@@ -87,7 +96,7 @@ class ArticleIngestor(BaseIngestor):
 
     def _try_archive_ph(self, url: str) -> tuple[str, str]:
         archive_url = f"https://archive.ph/newest/{url}"
-        resp = curl_requests.get(archive_url, allow_redirects=True, **self._REQUEST_KWARGS)
+        resp = curl_requests.get(archive_url, **{self._REDIRECT_KEY: True}, **self._REQUEST_KWARGS)
         if resp.status_code != 200:
             return "", ""
         text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
@@ -96,7 +105,7 @@ class ArticleIngestor(BaseIngestor):
 
     def _try_google_cache(self, url: str) -> tuple[str, str]:
         cache_url = f"https://webcache.googleusercontent.com/search?q=cache:{url}"
-        resp = curl_requests.get(cache_url, allow_redirects=True, **self._REQUEST_KWARGS)
+        resp = curl_requests.get(cache_url, **{self._REDIRECT_KEY: True}, **self._REQUEST_KWARGS)
         if resp.status_code != 200:
             return "", ""
         text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
