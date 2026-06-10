@@ -201,4 +201,4 @@ def sanitize_error_message(error: Exception) -> str:
     if "401" in str(error) or "unauthorized" in str(error).lower():
         return "Authentication error. Check your API key in Settings."
 
-    return f"An error occurred during processing. Please try again."
+    return f"{error_type}: An error occurred during processing. Please try again."
