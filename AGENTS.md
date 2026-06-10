@@ -54,7 +54,9 @@ app/
 
 ### LLM Integration
 - Default provider: OpenCode Zen (`deepseek-v4-flash-free` via `https://opencode.ai/zen/v1`)
-- BYOK: User can select OpenCode Zen models or use other OpenAI-compatible providers
+- BYOK: User can select from 8 providers or use any OpenAI-compatible endpoint
+- **Auto-detect**: `_on_api_key_change()` callback detects provider from key prefix (`AIza`→Gemini, `gsk_`→Groq, etc.)
+- **Connection status**: Sidebar shows `_render_llm_status()` with green/red indicator + "Test Connection" button
 - Response caching: LRU cache (50 entries, 1h TTL) in `ResponseCache`
 - Rate limiting: 30 LLM calls/minute per session via `RateLimiter`
 - Retries: 2 attempts with exponential backoff (3s-15s) on rate limit errors
@@ -63,6 +65,9 @@ app/
 - **Sequential batches** (not concurrent) to avoid rate limiting on free tiers
 - Batch A (executive_summary, key_takeaways) → 2s delay → Batch B (detailed_analysis, supporting_evidence) → 2s delay → Batch C (frameworks, action_items, risks, notable_quotes)
 - Dependent sections (missing_important, final_synthesis) run after batches with 1s delay between
+- **Resilience**: Each batch method (`_run_batch_a/b/c`) has try-catch that falls back to individual `_run_step_safe()` calls on failure; `_run_step_safe` catches its own exceptions and returns error strings
+- `categorize_content()` has its own try-catch returning fallback domain on failure
+- `_run_analysis()` wraps everything including `LLMClient()` construction in a try block with a defensive error handler (inner try-catch if `status`/`progress_bar` don't exist)
 
 ### Export Formats
 - **Markdown:** Jinja2 templates cached at module level

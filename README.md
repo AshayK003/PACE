@@ -22,7 +22,7 @@
 
 ## What it does
 
-PACE ingests content from **5 sources**, runs **10 parallel AI analyses**, and delivers a **structured report** — all in a single click.
+PACE ingests content from **5 sources**, runs **10 AI analyses in sequential batches**, and delivers a **structured report** — all in a single click.
 
 <div align="center">
 
@@ -41,22 +41,18 @@ PACE ingests content from **5 sources**, runs **10 parallel AI analyses**, and d
                            │
                            ▼
          ┌─────────────────────────────────────┐
-         │    Parallel LLM Analysis (3×Batch)  │
-         │    ┌─────┐ ┌─────┐ ┌─────┐         │
-         │    │  A  │ │  B  │ │  C  │         │
-         │    └──┬──┘ └──┬──┘ └──┬──┘         │
-         │       └───────┼───────┘             │
-         │               ▼                     │
-         │    ┌─────────────────┐              │
-         │    │  Final Synthesis │              │
-         │    └────────┬────────┘              │
-         └─────────────┼───────────────────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │  Markdown + PDF │
-              │     Report      │
-              └─────────────────┘
+         │   Sequential Batch LLM Analysis     │
+         │   A ──2s──► B ──2s──► C ──1s──►    │
+         │              Synthesis              │
+         │   (auto-fallback on failure)       │
+         └─────────────────┬───────────────────┘
+                           │
+                           ▼
+              ┌─────────────────────┐
+              │  Report + Markdown  │
+              │  PDF + EPUB + MD   │
+              │  + Obsidian Export  │
+              └─────────────────────┘
 ```
 
 </div>
@@ -105,7 +101,8 @@ PACE ingests content from **5 sources**, runs **10 parallel AI analyses**, and d
 
 ### Sequential Batches
 
-3 batches run sequentially with delays to avoid rate limits on free API tiers.
+3 batches run sequentially with delays to avoid rate limits.
+Auto-fallback to individual steps on batch failure.
 
 </td>
 <td width="33%">
@@ -119,7 +116,7 @@ LRU cache (50 entries, 1h TTL) — re-analyze the same content instantly.
 
 ### BYOK + OpenCode Zen
 
-Built-in free tier via OpenCode Zen, or use your own key from supported providers.
+Built-in free tier via OpenCode Zen, or use your own key from 8 supported providers.
 
 </td>
 </tr>
@@ -129,9 +126,10 @@ Built-in free tier via OpenCode Zen, or use your own key from supported provider
 <tr>
 <td width="33%">
 
-### SSRF Protection
+### LLM Status Indicator
 
-DNS resolution + IP blocking prevents server-side request forgery.
+Sidebar shows live connection status with a Test Connection button.
+Auto-detects provider from API key prefix.
 
 </td>
 <td width="33%">
@@ -143,9 +141,9 @@ Markdown, PDF, EPUB, and Obsidian (YAML frontmatter + vault paths).
 </td>
 <td width="33%">
 
-### Input Sanitization
+### Security
 
-50K char limit, prompt injection detection, error sanitization.
+Input sanitization, SSRF blocking, error sanitization, file validation.
 
 </td>
 </tr>
@@ -194,23 +192,24 @@ Opens at **http://localhost:8501**
 PACE works out of the box with a built-in free tier. To use your own key:
 
 1. Open the **sidebar** → **LLM Settings**
-2. Select a **preset** from the dropdown
-3. Enter your **API key**
+2. Select a **provider** or just paste your **API key** — the provider is auto-detected from the key prefix
+3. Select a **model** from the provider's list
+4. Click **Test Connection** to verify before analyzing
 
 > Your key is stored in session state only — never persisted to disk.
 
 ### Supported Providers
 
-| Provider | Endpoint | Models |
-|:---------|:---------|:-------|
-| **OpenCode Zen** (built-in free) | `opencode.ai/zen/v1` | deepseek-v4-flash-free, deepseek-v4-flash, deepseek-v3.1, gpt-4o-mini, claude-sonnet-4, gemini-2.5-flash, llama-3.3-70b |
-| **Gemini 2.5 Flash** | `generativelanguage.googleapis.com` | `gemini-2.5-flash` |
-| **Gemini 2.5 Flash-Lite** | `generativelanguage.googleapis.com` | `gemini-2.5-flash-lite` |
-| **Groq Llama 3.3 70B** | `api.groq.com` | `llama-3.3-70b-versatile` |
-| **Cerebras** | `api.cerebras.ai` | `llama-3.3-70b-versatile` |
-| **OpenRouter (free)** | `openrouter.ai` | `deepseek/deepseek-chat-v3.1:free` |
-| **Mistral Small** | `api.mistral.ai` | `mistral-small-latest` |
-| **DeepSeek V4 Flash** | `api.deepseek.com` | `deepseek-v4-flash` |
+| Provider | Endpoint | Key Prefix | Models |
+|:---------|:---------|:-----------|:-------|
+| **OpenCode Zen** (built-in free) | `opencode.ai/zen/v1` | — | deepseek-v4-flash-free, deepseek-v4-flash, deepseek-v3.1, gpt-4o-mini, gpt-4o, claude-sonnet-4, gemini-2.5-flash, llama-3.3-70b |
+| **Google Gemini** (free) | `generativelanguage.googleapis.com/v1beta/openai/` | `AIza` | `gemini-2.5-flash`, `gemini-2.5-flash-lite` |
+| **Groq** (free) | `api.groq.com/openai/v1` | `gsk_` | `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `llama-4-scout-17b-16e-instruct`, `qwen3-32b`, `gpt-oss-120b` |
+| **Cerebras** (free) | `api.cerebras.ai/v1` | `csk-` | `llama-3.3-70b`, `gpt-oss-120b` |
+| **OpenRouter** (free) | `openrouter.ai/api/v1` | `sk-or-` | deepseek/deepseek-r1-0528:free, deepseek/deepseek-chat-v3.1:free, qwen/qwen3-235b-a22b:free, meta-llama/llama-4-scout:free, meta-llama/llama-3.3-70b-instruct:free, google/gemma-4-31b-it:free, + more |
+| **Mistral** (free) | `api.mistral.ai/v1` | — | `mistral-small-latest`, `mistral-large-latest` |
+| **DeepSeek** | `api.deepseek.com` | `sk-` | `deepseek-v4-flash`, `deepseek-chat` |
+| **Custom** | any OpenAI-compatible | — | user-specified |
 
 ### Environment Variables
 
@@ -344,6 +343,7 @@ docker run -p 8501:8501 pace
 | **Authentication error** | Open sidebar → LLM Settings → select correct preset → enter your key |
 | **PDF garbled text** | Scanned PDFs need OCR. Run locally with `opendataloader-pdf` |
 | **Audio tab disabled** | `faster-whisper` requires local run. Not available on Streamlit Cloud |
+| **RequestBlocked (Gemini)** | Google's safety filters blocked the content. Try a different model (`gemini-1.5-flash`) or provider |
 | **429 Rate limit** | Wait before retrying. Response cache avoids duplicate calls |
 | **Slow first request** | PDF font downloads lazily. Cache warms after first analysis |
 | **SSRF blocks URL** | Only public URLs allowed. Private IPs blocked for security |
