@@ -41,11 +41,10 @@ class AnalysisPipeline:
             user_message=prompt,
         )
 
-    def _send_batch(self, prompt: str, max_tokens: int = 8000) -> str:
+    def _send_batch(self, prompt: str) -> str:
         return self.client.send(
             system_prompt=SYSTEM_PROMPT,
             user_message=prompt,
-            max_tokens=max_tokens,
         )
 
     def _run_batch_a(self, context: str) -> dict[str, str]:
