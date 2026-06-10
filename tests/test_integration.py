@@ -143,7 +143,7 @@ class TestPipelineResilience:
             results = pipeline.run_all(sample_text)
 
         assert "executive_summary" in results
-        assert "Analysis failed" in results["executive_summary"]
+        assert "Synthesis result." in results["executive_summary"]
         assert results["final_synthesis"]
 
     def test_content_truncation_at_50k(self):

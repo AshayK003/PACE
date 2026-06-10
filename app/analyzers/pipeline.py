@@ -41,18 +41,23 @@ class AnalysisPipeline:
             user_message=prompt,
         )
 
-    def _send_batch(self, prompt: str) -> str:
+    def _send_batch(self, prompt: str, max_tokens: int = 8000) -> str:
         return self.client.send(
             system_prompt=SYSTEM_PROMPT,
             user_message=prompt,
+            max_tokens=max_tokens,
         )
 
     def _run_batch_a(self, context: str) -> dict[str, str]:
-        prompt = BATCH_A_PROMPT.replace("__CONTENT__", context)
-        response = self._send_batch(prompt)
-        result = batch_a_response(response)
-        if response and all(len(result[s].strip()) >= 20 for s in _BATCH_A_SECTIONS if result[s]):
-            return result
+        try:
+            prompt = BATCH_A_PROMPT.replace("__CONTENT__", context)
+            response = self._send_batch(prompt)
+            if response:
+                result = batch_a_response(response)
+                if all(len(result[s].strip()) >= 20 for s in _BATCH_A_SECTIONS if result[s]):
+                    return result
+        except Exception:
+            pass
         fallback = {}
         for name in _BATCH_A_SECTIONS:
             step = next(s for s in self.steps if s.name == name)
@@ -60,11 +65,15 @@ class AnalysisPipeline:
         return fallback
 
     def _run_batch_b(self, context: str) -> dict[str, str]:
-        prompt = BATCH_B_PROMPT.replace("__CONTENT__", context)
-        response = self._send_batch(prompt)
-        result = batch_b_response(response)
-        if response and all(len(result[s].strip()) >= 20 for s in _BATCH_B_SECTIONS if result[s]):
-            return result
+        try:
+            prompt = BATCH_B_PROMPT.replace("__CONTENT__", context)
+            response = self._send_batch(prompt)
+            if response:
+                result = batch_b_response(response)
+                if all(len(result[s].strip()) >= 20 for s in _BATCH_B_SECTIONS if result[s]):
+                    return result
+        except Exception:
+            pass
         fallback = {}
         for name in _BATCH_B_SECTIONS:
             step = next(s for s in self.steps if s.name == name)
@@ -72,11 +81,15 @@ class AnalysisPipeline:
         return fallback
 
     def _run_batch_c(self, context: str) -> dict[str, str]:
-        prompt = BATCH_C_PROMPT.replace("__CONTENT__", context)
-        response = self._send_batch(prompt)
-        result = batch_c_response(response)
-        if response and all(len(result[s].strip()) >= 20 for s in _BATCH_C_SECTIONS if result[s]):
-            return result
+        try:
+            prompt = BATCH_C_PROMPT.replace("__CONTENT__", context)
+            response = self._send_batch(prompt)
+            if response:
+                result = batch_c_response(response)
+                if all(len(result[s].strip()) >= 20 for s in _BATCH_C_SECTIONS if result[s]):
+                    return result
+        except Exception:
+            pass
         fallback = {}
         for name in _BATCH_C_SECTIONS:
             step = next(s for s in self.steps if s.name == name)
