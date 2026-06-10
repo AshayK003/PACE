@@ -224,14 +224,13 @@ def _run_analysis(content: str, source_type: SourceType, source_url: str = "", t
 
     content = sanitize_input(content)
 
-    status = st.status("Starting analysis...", expanded=True)
-    progress_bar = st.progress(0.0)
-    api_key = st.session_state.get("api_key") or None
-    base_url = st.session_state.get("base_url") or None
-    model_name = st.session_state.get("model_name") or None
-    client = LLMClient(api_key=api_key, base_url=base_url, model=model_name)
-
     try:
+        status = st.status("Starting analysis...", expanded=True)
+        progress_bar = st.progress(0.0)
+        api_key = st.session_state.get("api_key") or None
+        base_url = st.session_state.get("base_url") or None
+        model_name = st.session_state.get("model_name") or None
+        client = LLMClient(api_key=api_key, base_url=base_url, model=model_name)
         lang = (metadata or {}).get("language", "")
         lang_lower = str(lang).strip().lower()[:2] if lang else "en"
         _ENGLISH_CODES = {"en", "eng", "english", ""}
@@ -327,12 +326,15 @@ def _run_analysis(content: str, source_type: SourceType, source_url: str = "", t
         st.rerun()
 
     except Exception as e:
-        progress_bar.empty()
-        status.update(label="Analysis failed", state="error")
         msg = sanitize_error_message(e)
-        status.write(f"Error: {msg}")
-        status.write(f"({type(e).__module__}.{type(e).__name__})")
-        show_error("Analysis failed. See the status panel above for details.")
+        try:
+            progress_bar.empty()
+            status.update(label="Analysis failed", state="error")
+            status.write(f"Error: {msg}")
+            status.write(f"({type(e).__module__}.{type(e).__name__})")
+        except Exception:
+            pass
+        show_error(f"Analysis failed: {msg}")
 
 
 if __name__ == "__main__":
