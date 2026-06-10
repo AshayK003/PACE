@@ -331,6 +331,7 @@ def _run_analysis(content: str, source_type: SourceType, source_url: str = "", t
         status.update(label="Analysis failed", state="error")
         msg = sanitize_error_message(e)
         status.write(f"Error: {msg}")
+        status.write(f"({type(e).__module__}.{type(e).__name__})")
         show_error("Analysis failed. See the status panel above for details.")
 
 
