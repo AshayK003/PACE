@@ -167,6 +167,24 @@ def _render_llm_status() -> None:
         st.rerun()
 
 
+def _on_api_key_change() -> None:
+    api_key = st.session_state.get("api_key", "")
+    current = st.session_state.get("_llm_provider", next(iter(PROVIDERS)))
+    if not api_key:
+        st.session_state.pop("_prev_api_key", None)
+        return
+    prev = st.session_state.get("_prev_api_key", "")
+    if api_key == prev:
+        return
+    st.session_state["_prev_api_key"] = api_key
+    detected = _detect_provider(api_key)
+    if detected and detected != current:
+        st.session_state["_llm_provider"] = detected
+        models = PROVIDERS[detected]["models"]
+        if models:
+            st.session_state["model_name"] = models[0]
+
+
 def render_sidebar() -> None:
     with st.sidebar:
         st.markdown("### PACE")
@@ -206,27 +224,13 @@ def render_sidebar() -> None:
                 key="api_key",
                 placeholder="Paste your API key — provider auto-detected",
                 help=prov["help"],
+                on_change=_on_api_key_change,
             )
-
-            prev_key = st.session_state.get("_prev_api_key", "")
-            if api_key and api_key != prev_key:
-                detected = _detect_provider(api_key)
-                if detected and detected != provider:
-                    st.session_state["_llm_provider"] = detected
-                    if PROVIDERS[detected]["models"]:
-                        st.session_state["model_name"] = PROVIDERS[detected]["models"][0]
-                    st.session_state["_prev_api_key"] = api_key
-                    st.rerun()
-                else:
-                    st.session_state["_prev_api_key"] = api_key
-            elif not api_key:
-                st.session_state.pop("_prev_api_key", None)
 
             if prov["models"]:
                 current_model = st.session_state.get("model_name", prov["models"][0])
                 if current_model not in prov["models"]:
                     current_model = prov["models"][0]
-                    st.session_state["model_name"] = current_model
                 model = st.selectbox(
                     "Model",
                     options=prov["models"],
