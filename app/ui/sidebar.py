@@ -1,6 +1,11 @@
 import streamlit as st
 
-from app.config import build_export_path
+from app.config import BASE_URL, build_export_path
+
+try:
+    from curl_cffi import requests as _curl_requests
+except Exception:
+    import httpx as _curl_requests  # type: ignore[no-redef]
 
 _DOMAINS = [
     "Tech", "Business", "Science", "Health", "Education",
@@ -116,6 +121,52 @@ def _detect_provider(api_key: str) -> str | None:
     return None
 
 
+def _test_llm_connection(provider: str, model: str, api_key: str, base_url: str) -> tuple[bool, str]:
+    url = (base_url or BASE_URL).rstrip("/")
+    key = api_key or "no-key"
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    payload = {"model": model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1, "stream": False}
+    try:
+        resp = _curl_requests.post(f"{url}/chat/completions", headers=headers, json=payload, timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            actual = data.get("model", model)
+            return True, f"Connected — {actual}"
+        body = resp.text[:300]
+        return False, f"HTTP {resp.status_code} — {body}"
+    except Exception as exc:
+        return False, f"Connection failed — {exc}"
+
+
+def _render_llm_status() -> None:
+    st.divider()
+    provider = st.session_state.get("_llm_provider", next(iter(PROVIDERS)))
+    model = st.session_state.get("model_name", "")
+    api_key = st.session_state.get("api_key", "") or ""
+    base_url = st.session_state.get("base_url", "") or ""
+
+    resolved_url = (base_url or BASE_URL).rstrip("/") if (base_url or BASE_URL) else ""
+    test_config = f"{provider}|{model}|{resolved_url}"
+
+    prev_test_config = st.session_state.get("_prev_test_config", "")
+    if prev_test_config and test_config != prev_test_config:
+        st.session_state.pop("llm_test_result", None)
+
+    result = st.session_state.get("llm_test_result")
+    if result:
+        ok, msg = result
+        icon = ":material/check_circle:" if ok else ":material/error:"
+        st.markdown(f"**LLM Status** {icon}  \n{msg} — `{provider}` · `{model}`")
+    else:
+        st.markdown(f"**LLM Status**  \n`{provider}` · `{model}`")
+
+    if st.button("Test Connection", key="test_llm_btn", use_container_width=True):
+        ok, msg = _test_llm_connection(provider, model, api_key, base_url)
+        st.session_state["llm_test_result"] = (ok, msg)
+        st.session_state["_prev_test_config"] = test_config
+        st.rerun()
+
+
 def render_sidebar() -> None:
     with st.sidebar:
         st.markdown("### PACE")
@@ -157,17 +208,29 @@ def render_sidebar() -> None:
                 help=prov["help"],
             )
 
-            if api_key and provider == provider_names[0]:
+            prev_key = st.session_state.get("_prev_api_key", "")
+            if api_key and api_key != prev_key:
                 detected = _detect_provider(api_key)
-                if detected and detected != provider_names[0]:
-                    st.info(f"Detected: **{detected}** — switching provider.")
+                if detected and detected != provider:
                     st.session_state["_llm_provider"] = detected
+                    if PROVIDERS[detected]["models"]:
+                        st.session_state["model_name"] = PROVIDERS[detected]["models"][0]
+                    st.session_state["_prev_api_key"] = api_key
                     st.rerun()
+                else:
+                    st.session_state["_prev_api_key"] = api_key
+            elif not api_key:
+                st.session_state.pop("_prev_api_key", None)
 
             if prov["models"]:
+                current_model = st.session_state.get("model_name", prov["models"][0])
+                if current_model not in prov["models"]:
+                    current_model = prov["models"][0]
+                    st.session_state["model_name"] = current_model
                 model = st.selectbox(
                     "Model",
                     options=prov["models"],
+                    index=prov["models"].index(current_model),
                     key="model_name",
                     help="Select a model from this provider.",
                 )
@@ -188,6 +251,8 @@ def render_sidebar() -> None:
                 )
             else:
                 st.session_state["base_url"] = prov["base_url"]
+
+        _render_llm_status()
 
         if st.session_state.get("md_content"):
             _render_export_path_section()
