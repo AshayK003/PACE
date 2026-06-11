@@ -13,6 +13,7 @@
 [![Tests](https://img.shields.io/badge/Tests-252%20passing-00C853?style=for-the-badge&logo=pytest&logoColor=white)]()
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen?style=for-the-badge)](CONTRIBUTING.md)
+[![GitHub Stars](https://img.shields.io/github/stars/AshayK003/PACE?style=for-the-badge&logo=github)](https://github.com/AshayK003/PACE)
 
 </div>
 
