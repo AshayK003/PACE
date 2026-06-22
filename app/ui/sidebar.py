@@ -268,8 +268,8 @@ def render_sidebar() -> None:
         )
         st.markdown(
             '<div style="margin-top:16px;text-align:center;">'
-            '<a href="https://chai4.me/darkcharon3301" target="_blank" '
-            'title="Support darkcharon3301 on Chai4Me" '
+            '<a href="https://chai4.me/ashaykushwaha003" target="_blank" '
+            'title="Support on Chai4Me" '
             'style="display:inline-flex;flex-direction:column;align-items:center;'
             'justify-content:center;background:#ffffff;padding:8px 32px;'
             'border-radius:16px;text-decoration:none;border:1px solid #e5e7eb;'
