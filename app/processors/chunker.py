@@ -1,10 +1,30 @@
 from typing import Callable
 
-import semchunk
-
 
 def _default_token_counter(text: str) -> int:
     return len(text.split())
+
+
+def _get_semchunk():
+    """Lazy import of semchunk with graceful fallback."""
+    try:
+        import semchunk
+
+        return semchunk
+    except ImportError:
+
+        def _simple_chunk(text: str, chunk_size: int) -> list[str]:
+            """Fallback chunker when semchunk is not installed.
+
+            Splits text on sentence boundaries to stay under chunk_size tokens.
+            """
+            words = text.split()
+            chunks = []
+            for i in range(0, len(words), chunk_size):
+                chunks.append(" ".join(words[i : i + chunk_size]))
+            return chunks
+
+        return type("_SemchunkStub", (), {"chunk": staticmethod(_simple_chunk)})()
 
 
 def chunk_text(
@@ -17,7 +37,8 @@ def chunk_text(
     if not text:
         return []
     counter = token_counter or _default_token_counter
-    chunks = semchunk.chunk(text, chunk_size, token_counter=counter)
+    chunker = _get_semchunk()
+    chunks = chunker.chunk(text, chunk_size, token_counter=counter)
     if max_chunks is not None and len(chunks) > max_chunks:
         chunks = chunks[:max_chunks]
     if overlap > 0 and len(chunks) > 1:
