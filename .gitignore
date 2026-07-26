@@ -39,6 +39,9 @@ temp_audio/
 # Skill evaluation artifacts
 evals/
 
+# Internal audit files (AEOS, engineering memory, bottlenecks, etc.)
+internals/
+
 # Environment
 .env
 .env.local
