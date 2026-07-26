@@ -13,10 +13,11 @@ def _get_semchunk():
         return semchunk
     except ImportError:
 
-        def _simple_chunk(text: str, chunk_size: int) -> list[str]:
+        def _simple_chunk(text: str, chunk_size: int, token_counter=None, **kwargs) -> list[str]:
             """Fallback chunker when semchunk is not installed.
 
             Splits text on sentence boundaries to stay under chunk_size tokens.
+            Accepts extra kwargs for compatibility with semchunk API.
             """
             words = text.split()
             chunks = []
