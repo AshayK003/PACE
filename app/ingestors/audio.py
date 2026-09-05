@@ -26,9 +26,12 @@ class AudioIngestor(BaseIngestor):
         if not source_path.exists():
             raise FileNotFoundError(f"Audio file not found: {source}")
         if _is_cloud():
+            # Empty text + flag: main.py already short-circuits on empty
+            # text, so this can never be analyzed as real content.
             return {
                 "title": source_path.name,
-                "text": "Audio transcription is not available in cloud environment. "
+                "text": "",
+                "note": "Audio transcription is not available in cloud environment. "
                         "Please run the analysis locally with ffmpeg installed.",
                 "metadata": {
                     "model": "none",

@@ -143,7 +143,8 @@ _MP3_ID3 = b"ID3"
 _WAV_MAGIC = b"RIFF"
 _OGG_MAGIC = b"OggS"
 _FLAC_MAGIC = b"fLaC"
-_M4A_MAGIC = b"\x1a\x45\xdf\xa3"
+# M4A is an MP4 container: brand box "ftyp" at offset 4 (NOT EBML — that's MKV).
+_M4A_FTYP = b"ftyp"
 
 _FILE_SIGNATURES = {
     ".pdf": [_PDF_MAGIC],
@@ -151,7 +152,7 @@ _FILE_SIGNATURES = {
     ".wav": [_WAV_MAGIC],
     ".ogg": [_OGG_MAGIC],
     ".flac": [_FLAC_MAGIC],
-    ".m4a": [_M4A_MAGIC],
+    ".m4a": [_M4A_FTYP],
 }
 
 
@@ -168,6 +169,9 @@ def validate_file_magic(file_bytes: bytes, expected_ext: str) -> tuple[bool, str
         return False, f"Unknown file extension: {ext}"
 
     expected_signatures = _FILE_SIGNATURES[ext]
+    # MP4-family brand box sits at offset 4, not 0.
+    if ext == ".m4a" and len(file_bytes) >= 8 and file_bytes[4:8] == _M4A_FTYP:
+        return True, "OK"
     for sig in expected_signatures:
         if file_bytes[:len(sig)] == sig:
             return True, "OK"

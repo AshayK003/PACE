@@ -32,13 +32,13 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pytest pytest-cov
+        run: pip install -r requirements.txt pytest pytest-cov faster-whisper
 
       - name: Lint (ruff)
         run: python -m ruff check . || true
 
       - name: Test (pytest)
-        run: python -m pytest tests/ -v --tb=short -q --cov=app --cov-report=xml || true
+        run: python -m pytest tests/ -v --tb=short -q --cov=app --cov-report=xml
 
       - name: Upload coverage
         uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8 # v4.3.0

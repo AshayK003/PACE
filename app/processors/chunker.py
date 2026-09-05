@@ -40,10 +40,12 @@ def chunk_text(
     counter = token_counter or _default_token_counter
     chunker = _get_semchunk()
     chunks = chunker.chunk(text, chunk_size, token_counter=counter)
-    if max_chunks is not None and len(chunks) > max_chunks:
-        chunks = chunks[:max_chunks]
     if overlap > 0 and len(chunks) > 1:
         chunks = _add_overlap(chunks, overlap, counter)
+    if max_chunks is not None and len(chunks) > max_chunks:
+        dropped = len(chunks) - max_chunks
+        chunks = chunks[:max_chunks]
+        chunks[-1] = chunks[-1] + f"\n\n[truncated: {dropped} further chunk(s) omitted]"
     return chunks
 
 

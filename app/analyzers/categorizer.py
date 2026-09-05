@@ -57,13 +57,34 @@ def categorize_content(
 
 
 def _parse_response(response: str) -> dict:
-    match = re.search(r"\{[^}]+\}", response)
-    if not match:
-        return dict(_FALLBACK)
-    try:
-        return json.loads(match.group())
-    except json.JSONDecodeError:
-        return dict(_FALLBACK)
+    # Balanced-brace scan: regex \{[^}]+\} truncates nested objects and
+    # braces inside strings, forcing silent fallback.
+    start = response.find("{")
+    while start != -1:
+        depth, in_str, esc = 0, False, False
+        for i in range(start, len(response)):
+            ch = response[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+                continue
+            if ch == '"':
+                in_str = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(response[start:i + 1])
+                    except json.JSONDecodeError:
+                        break
+        start = response.find("{", start + 1)
+    return dict(_FALLBACK)
 
 
 def _validate_result(result: dict) -> dict:

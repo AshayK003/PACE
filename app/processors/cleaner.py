@@ -2,10 +2,15 @@ import re
 from typing import Pattern
 
 FILLER_WORDS = {
-    "um", "uh", "like", "basically", "you know",
-    "i mean", "sort of", "kind of", "so", "well", "literally",
-    "honestly", "essentially", "virtually",
+    "um", "uh", "basically", "you know",
+    "i mean", "sort of", "kind of",
+    "essentially", "virtually", "honestly", "literally",
 }
+
+# Ordinary words that are fillers ONLY as standalone interjections
+# ("So, um…" / "…, like, …") — never inside real meaning
+# ("so the result", "I like pie" must survive).
+_POSITIONAL_FILLERS = {"so", "like", "well"}
 
 
 def _build_filler_pattern() -> Pattern:
@@ -16,7 +21,16 @@ def _build_filler_pattern() -> Pattern:
     )
 
 
+def _build_positional_filler_pattern() -> Pattern:
+    words = sorted(_POSITIONAL_FILLERS, key=len, reverse=True)
+    return re.compile(
+        r"(?:^|\s*,\s*)(?:" + "|".join(re.escape(w) for w in words) + r")\s*,",
+        re.IGNORECASE,
+    )
+
+
 _FILLER_PATTERN = _build_filler_pattern()
+_POSITIONAL_FILLER_PATTERN = _build_positional_filler_pattern()
 _REPEATED_PUNCT_PATTERN = re.compile(r"[,]{2,}\s*[,]*")
 _MULTI_SPACE_PATTERN = re.compile(r"[ \t]{2,}")
 _TIMESTAMP_PATTERN = re.compile(r"\b\d{1,2}:\d{2}(?::\d{2})?\s*", re.MULTILINE)
@@ -27,6 +41,7 @@ def remove_fillers(text: str) -> str:
     if not text:
         return text
     result = _FILLER_PATTERN.sub("", text)
+    result = _POSITIONAL_FILLER_PATTERN.sub("", result)
     result = _REPEATED_PUNCT_PATTERN.sub(", ", result)
     result = _MULTI_SPACE_PATTERN.sub(" ", result)
     result = result.replace(", ,", ",").replace("  ,", " ").replace(",  ", ", ")

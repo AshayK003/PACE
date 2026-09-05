@@ -142,7 +142,13 @@ class TestCleaner:
     def test_cleaner_with_only_fillers(self):
         """Text consisting entirely of filler words should become empty."""
         from app.processors.cleaner import clean_pipeline
-        assert clean_pipeline("um uh like basically you know") == ""
+        assert clean_pipeline("um uh, like, basically you know") == ""
+
+    def test_fillers_inside_meaning_survive(self):
+        """Ordinary words are fillers only as standalone interjections."""
+        from app.processors.cleaner import clean_pipeline
+        assert clean_pipeline("so the result shows it") == "so the result shows it"
+        assert clean_pipeline("I like pie") == "I like pie"
 
     def test_cleaner_with_mixed_timestamps_and_fillers(self):
         """Timestamps and fillers should both be removed."""

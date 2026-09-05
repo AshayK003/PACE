@@ -18,6 +18,8 @@ from app.security import is_safe_url
 
 class ArticleIngestor(BaseIngestor):
     _REQUEST_KWARGS: dict[str, Any] = {"timeout": 15}
+    # Largest single fetch we'll parse (chars) — bounds memory downstream.
+    _MAX_FETCH_CHARS = 5_000_000
     _REDIRECT_KEY = "allow_redirects" if _HAS_CURL_CFFI else "follow_redirects"
     if _HAS_CURL_CFFI:
         _REQUEST_KWARGS["impersonate"] = "chrome"
@@ -66,6 +68,8 @@ class ArticleIngestor(BaseIngestor):
         try:
             resp = curl_requests.get(url, **self._REQUEST_KWARGS)
             if resp.status_code == 200 and len(resp.text) > 100:
+                if len(resp.text) > self._MAX_FETCH_CHARS:
+                    raise ValueError(f"Page too large ({len(resp.text)} chars)")
                 text = trafilatura.extract(resp.text, output_format="txt", include_links=True) or ""
                 if text and len(text.strip()) > 100:
                     return text, resp.text
@@ -75,6 +79,8 @@ class ArticleIngestor(BaseIngestor):
         html = trafilatura.fetch_url(url)
         if not html:
             return "", ""
+        if len(html) > self._MAX_FETCH_CHARS:
+            raise ValueError(f"Page too large ({len(html)} chars)")
         text = trafilatura.extract(html, output_format="txt", include_links=True) or ""
         return text, html
 
@@ -87,6 +93,8 @@ class ArticleIngestor(BaseIngestor):
         snapshot = data.get("archived_snapshots", {}).get("closest", {})
         if not snapshot or not snapshot.get("url"):
             return "", ""
+        if not is_safe_url(snapshot["url"]):
+            return "", ""
         html = trafilatura.fetch_url(snapshot["url"])
         if not html:
             return "", ""
@@ -96,6 +104,8 @@ class ArticleIngestor(BaseIngestor):
 
     def _try_archive_ph(self, url: str) -> tuple[str, str]:
         archive_url = f"https://archive.ph/newest/{url}"
+        if not is_safe_url(archive_url):
+            return "", ""
         resp = curl_requests.get(archive_url, **{self._REDIRECT_KEY: True}, **self._REQUEST_KWARGS)
         if resp.status_code != 200:
             return "", ""
@@ -105,6 +115,8 @@ class ArticleIngestor(BaseIngestor):
 
     def _try_google_cache(self, url: str) -> tuple[str, str]:
         cache_url = f"https://webcache.googleusercontent.com/search?q=cache:{url}"
+        if not is_safe_url(cache_url):
+            return "", ""
         resp = curl_requests.get(cache_url, **{self._REDIRECT_KEY: True}, **self._REQUEST_KWARGS)
         if resp.status_code != 200:
             return "", ""

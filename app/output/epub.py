@@ -65,8 +65,11 @@ def render_epub(
 
 
 def _strip_front_matter(md: str) -> str:
+    # Only strip real front matter: opening --- on line 1 through the
+    # closing ---. A thematic break mid-document must never delete content.
     lines = md.split("\n")
-    for i, line in enumerate(lines):
-        if line.strip() == "---":
-            return "\n".join(lines[i + 1:])
+    if lines and lines[0].strip() == "---":
+        for i in range(1, len(lines)):
+            if lines[i].strip() == "---":
+                return "\n".join(lines[i + 1:])
     return md

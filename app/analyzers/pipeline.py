@@ -1,7 +1,10 @@
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Any, Callable
+
+log = logging.getLogger(__name__)
 
 from app.analyzers.llm_client import LLMClient
 from app.analyzers.prompts import (
@@ -35,7 +38,7 @@ class AnalysisPipeline:
         ]
 
     def run_step(self, step: PipelineStep, context: str) -> str:
-        prompt = step.prompt_template.replace("__CONTENT__", context)
+        prompt = step.prompt_template.replace("__CONTENT__", "<untrusted-content>\n" + context + "\n</untrusted-content>")
         return self.client.send(
             system_prompt=SYSTEM_PROMPT,
             user_message=prompt,
@@ -49,14 +52,14 @@ class AnalysisPipeline:
 
     def _run_batch_a(self, context: str) -> dict[str, str]:
         try:
-            prompt = BATCH_A_PROMPT.replace("__CONTENT__", context)
+            prompt = BATCH_A_PROMPT.replace("__CONTENT__", "<untrusted-content>\n" + context + "\n</untrusted-content>")
             response = self._send_batch(prompt)
             if response:
                 result = batch_a_response(response)
-                if all(len(result[s].strip()) >= 20 for s in _BATCH_A_SECTIONS if result[s]):
+                if all(s in result and len(result[s].strip()) >= 20 for s in _BATCH_A_SECTIONS):
                     return result
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("batch A failed, using per-step fallback: %s", e)
         fallback = {}
         for name in _BATCH_A_SECTIONS:
             step = next(s for s in self.steps if s.name == name)
@@ -65,14 +68,14 @@ class AnalysisPipeline:
 
     def _run_batch_b(self, context: str) -> dict[str, str]:
         try:
-            prompt = BATCH_B_PROMPT.replace("__CONTENT__", context)
+            prompt = BATCH_B_PROMPT.replace("__CONTENT__", "<untrusted-content>\n" + context + "\n</untrusted-content>")
             response = self._send_batch(prompt)
             if response:
                 result = batch_b_response(response)
-                if all(len(result[s].strip()) >= 20 for s in _BATCH_B_SECTIONS if result[s]):
+                if all(s in result and len(result[s].strip()) >= 20 for s in _BATCH_B_SECTIONS):
                     return result
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("batch B failed, using per-step fallback: %s", e)
         fallback = {}
         for name in _BATCH_B_SECTIONS:
             step = next(s for s in self.steps if s.name == name)
@@ -81,14 +84,14 @@ class AnalysisPipeline:
 
     def _run_batch_c(self, context: str) -> dict[str, str]:
         try:
-            prompt = BATCH_C_PROMPT.replace("__CONTENT__", context)
+            prompt = BATCH_C_PROMPT.replace("__CONTENT__", "<untrusted-content>\n" + context + "\n</untrusted-content>")
             response = self._send_batch(prompt)
             if response:
                 result = batch_c_response(response)
-                if all(len(result[s].strip()) >= 20 for s in _BATCH_C_SECTIONS if result[s]):
+                if all(s in result and len(result[s].strip()) >= 20 for s in _BATCH_C_SECTIONS):
                     return result
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("batch C failed, using per-step fallback: %s", e)
         fallback = {}
         for name in _BATCH_C_SECTIONS:
             step = next(s for s in self.steps if s.name == name)

@@ -122,7 +122,10 @@ def _detect_provider(api_key: str) -> str | None:
 
 
 def _test_llm_connection(provider: str, model: str, api_key: str, base_url: str) -> tuple[bool, str]:
+    from app.security import is_safe_url
     url = (base_url or BASE_URL).rstrip("/")
+    if not is_safe_url(url):
+        return False, "Blocked endpoint URL."
     key = api_key or "no-key"
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     payload = {"model": model, "messages": [{"role": "user", "content": "hi"}], "max_tokens": 1, "stream": False}
@@ -132,10 +135,9 @@ def _test_llm_connection(provider: str, model: str, api_key: str, base_url: str)
             data = resp.json()
             actual = data.get("model", model)
             return True, f"Connected — {actual}"
-        body = resp.text[:300]
-        return False, f"HTTP {resp.status_code} — {body}"
-    except Exception as exc:
-        return False, f"Connection failed — {exc}"
+        return False, f"HTTP {resp.status_code} — no details"
+    except Exception:
+        return False, "Connection failed — check URL, model, and key."
 
 
 def _render_llm_status() -> None:

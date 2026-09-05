@@ -340,14 +340,14 @@ class TestPDFRenderer:
         assert expected_section in text
 
     @pytest.mark.parametrize("md,expected_stripped", [
-        ("# Title\n\n---\n\nBody", "Body"),
+        ("# Title\n\n---\n\nBody", "# Title"),
         ("No separator here", "No separator here"),
-        ("---\n\nSecond ---\n\nBody", "Second"),
+        ("---\ntitle: Skipped\n---\nBody", "Body"),
         ("", ""),
-        ("# Only metadata\n\n---", ""),
+        ("# Only metadata\n\n---", "# Only metadata"),
     ])
     def test_strip_front_matter(self, md, expected_stripped):
-        """Front matter before first --- should be stripped."""
+        """Only a leading ---...--- block is front matter; mid-doc breaks stay."""
         from app.output.pdf import _strip_front_matter
         result = _strip_front_matter(md).strip()
         if expected_stripped:
