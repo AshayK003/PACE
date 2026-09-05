@@ -97,3 +97,33 @@ def test_prompt_delimiters_present():
     from app.analyzers import pipeline as pl
     src = inspect.getsource(pl)
     assert "<untrusted-content>" in src
+
+
+def test_strip_single_source_of_truth():
+    from app.output._shared import strip_front_matter as shared
+    from app.output.pdf import _strip_front_matter as pdf_strip
+    from app.output.epub import _strip_front_matter as epub_strip
+    from app.output.obsidian import _strip_existing_frontmatter as obs_strip
+    doc = "# Title\n\n---\n\nBody here, long enough."
+    fm = "---\ntitle: x\n---\nReal body content here."
+    for fn in (pdf_strip, epub_strip, obs_strip):
+        assert fn(doc) == shared(doc) == doc
+        assert fn(fm) == shared(fm) == "Real body content here."
+
+
+def test_aac_wma_magic_covered():
+    assert validate_file_magic(b"\xff\xf1" + bytes(64), ".aac")[0] is True
+    assert validate_file_magic(b"\xff\xf9" + bytes(64), ".aac")[0] is True
+    assert validate_file_magic(b"ID3" + bytes(64), ".aac")[0] is True
+    asf = bytes.fromhex("3026b2758e66cf11a6d900aa0062ce6c")
+    assert validate_file_magic(asf + bytes(64), ".wma")[0] is True
+
+
+def test_uploader_matches_config_extensions():
+    import re
+    from app.config import ALLOWED_AUDIO_EXTENSIONS
+    src = open("app/main.py", encoding="utf-8").read()
+    m = re.search(r"st\.file_uploader\(\"Upload an audio file\", type=\[([^\]]+)\]\)", src)
+    assert m, "audio uploader not found"
+    ui_exts = {"." + s.strip().strip("\"'").lstrip(".") for s in m.group(1).split(",")}
+    assert ui_exts == set(ALLOWED_AUDIO_EXTENSIONS), (ui_exts, ALLOWED_AUDIO_EXTENSIONS)

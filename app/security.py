@@ -145,6 +145,12 @@ _OGG_MAGIC = b"OggS"
 _FLAC_MAGIC = b"fLaC"
 # M4A is an MP4 container: brand box "ftyp" at offset 4 (NOT EBML — that's MKV).
 _M4A_FTYP = b"ftyp"
+# AAC: ADTS frame sync (0xFFFx) or ID3 tag.
+_AAC_ADTS_1 = b"\xff\xf1"
+_AAC_ADTS_2 = b"\xff\xf9"
+_AAC_ID3 = b"ID3"
+# WMA: ASF header GUID.
+_WMA_ASF = bytes.fromhex("3026b2758e66cf11a6d900aa0062ce6c")
 
 _FILE_SIGNATURES = {
     ".pdf": [_PDF_MAGIC],
@@ -153,6 +159,8 @@ _FILE_SIGNATURES = {
     ".ogg": [_OGG_MAGIC],
     ".flac": [_FLAC_MAGIC],
     ".m4a": [_M4A_FTYP],
+    ".aac": [_AAC_ADTS_1, _AAC_ADTS_2, _AAC_ID3],
+    ".wma": [_WMA_ASF],
 }
 
 

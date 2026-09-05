@@ -181,7 +181,7 @@ def handle_source_input(source_type: SourceType) -> None:
                 show_error(sanitize_error_message(e))
 
     elif source_type == SourceType.AUDIO:
-        uploaded = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a", "ogg"])
+        uploaded = st.file_uploader("Upload an audio file", type=["mp3", "wav", "m4a", "ogg", "flac", "aac", "wma"])
         if uploaded:
             if uploaded.size > _MAX_FILE_BYTES:
                 show_error(f"File too large ({uploaded.size / 1024 / 1024:.1f} MB). Maximum is {_MAX_FILE_SIZE_MB} MB.")
